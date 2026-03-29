@@ -1,47 +1,21 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import {
   Plus, Search, Filter, MoreVertical, Edit2, Trash2, Eye, X,
   ChevronLeft, ChevronRight, Upload, Package, AlertTriangle, CheckCircle2,
   ArrowUpDown, Grid3X3, List, Image as ImageIcon
 } from "lucide-react";
-import { IMAGES } from "../../data/store";
+import {
+  AdminProduct,
+  BrandRef,
+  CategoryRef,
+  getProducts,
+  getReferences,
+  createProduct,
+  updateProduct,
+  deleteProduct
+} from "../../api/adminProducts";
 
-// ─── Types ───
-interface AdminProduct {
-  id: string;
-  name: string;
-  sku: string;
-  brand: string;
-  category: string;
-  price: number;
-  oldPrice?: number;
-  stock: number;
-  status: "active" | "draft" | "outofstock";
-  image: string;
-  energy: string;
-  specs: string;
-  description: string;
-  createdAt: string;
-}
-
-// ─── Mock Data ───
-const MOCK_PRODUCTS: AdminProduct[] = [
-  { id: "P001", name: "Réfrigérateur Multi-Portes RF23", sku: "SAM-RF23-001", brand: "Samsung", category: "Réfrigérateurs", price: 189000, oldPrice: 232000, stock: 24, status: "active", image: IMAGES.fridge, energy: "A+++", specs: "634L, No Frost, A+++", description: "Réfrigérateur haut de gamme avec technologie No Frost et compresseur Digital Inverter.", createdAt: "2026-01-15" },
-  { id: "P002", name: "Lave-linge EcoSilence 9kg", sku: "BOS-ECO9-002", brand: "Bosch", category: "Machines à laver", price: 109000, stock: 18, status: "active", image: IMAGES.washer, energy: "A+++", specs: "9kg, 1400tr/min, A+++", description: "Machine à laver silencieuse avec moteur EcoSilence Drive sans balais.", createdAt: "2026-01-20" },
-  { id: "P003", name: "Four Multifonction Pyrolyse", sku: "SIE-PYR-003", brand: "Siemens", category: "Fours", price: 130000, oldPrice: 160000, stock: 12, status: "active", image: IMAGES.oven, energy: "A+", specs: "71L, Pyrolyse, A+", description: "Four encastrable avec nettoyage par pyrolyse et 12 modes de cuisson.", createdAt: "2026-02-05" },
-  { id: "P004", name: "Climatiseur Mural Inverter", sku: "LG-INV12-004", brand: "LG", category: "Climatiseurs", price: 94000, stock: 32, status: "active", image: IMAGES.ac, energy: "A++", specs: "12000 BTU, R32, Wi-Fi", description: "Climatiseur Dual Inverter avec contrôle Wi-Fi et gaz R32 écologique.", createdAt: "2026-02-10" },
-  { id: "P005", name: "Lave-vaisselle Silence Plus", sku: "MIE-SIL14-005", brand: "Miele", category: "Lave-vaisselle", price: 174000, stock: 8, status: "active", image: IMAGES.dishwasher, energy: "A+++", specs: "14 couverts, 44dB, A+++", description: "Le lave-vaisselle le plus silencieux de sa catégorie avec AutoDos.", createdAt: "2026-02-18" },
-  { id: "P006", name: "Aspirateur Robot S7 MaxV", sku: "ROB-S7MV-006", brand: "Roborock", category: "Aspirateurs", price: 80000, oldPrice: 101000, stock: 0, status: "outofstock", image: IMAGES.vacuum, energy: "A", specs: "5100Pa, LiDAR, Auto-vidage", description: "Robot aspirateur avec reconnaissance d'obstacles par caméra et station de vidage.", createdAt: "2026-03-01" },
-  { id: "P007", name: "Machine à Expresso Automatique", sku: "DEL-EXP-007", brand: "De'Longhi", category: "Petit électroménager", price: 69000, stock: 45, status: "active", image: IMAGES.coffee, energy: "A+", specs: "15 bars, Broyeur intégré", description: "Cafetière automatique avec broyeur conique intégré et mousseur de lait.", createdAt: "2026-03-05" },
-  { id: "P008", name: "TV OLED 55\" C3", sku: "LG-OLED55-008", brand: "LG", category: "TV & Son", price: 203000, oldPrice: 261000, stock: 6, status: "active", image: IMAGES.tv, energy: "G", specs: "4K, 120Hz, Dolby Vision", description: "Téléviseur OLED avec processeur α9 Gen6 AI, Dolby Vision IQ et Atmos.", createdAt: "2026-03-10" },
-  { id: "P009", name: "Réfrigérateur Side-by-Side", sku: "SAM-SBS-009", brand: "Samsung", category: "Réfrigérateurs", price: 215000, stock: 3, status: "active", image: IMAGES.fridge, energy: "A++", specs: "680L, SpaceMax, Twin Cooling", description: "Réfrigérateur américain avec technologie SpaceMax et distributeur d'eau.", createdAt: "2026-03-12" },
-  { id: "P010", name: "Sèche-linge Pompe à chaleur 8kg", sku: "BOS-DRY8-010", brand: "Bosch", category: "Machines à laver", price: 125000, stock: 0, status: "draft", image: IMAGES.washer, energy: "A+++", specs: "8kg, Pompe à chaleur, AutoDry", description: "Sèche-linge avec pompe à chaleur et programme AutoDry pour un séchage optimal.", createdAt: "2026-03-18" },
-  { id: "P011", name: "Micro-ondes Combiné 32L", sku: "SIE-MCO32-011", brand: "Siemens", category: "Petit électroménager", price: 52000, stock: 28, status: "active", image: IMAGES.oven, energy: "A", specs: "32L, Grill, Convection", description: "Micro-ondes combiné avec fonction grill et convection, 32 litres.", createdAt: "2026-03-20" },
-  { id: "P012", name: "Climatiseur Mobile 9000 BTU", sku: "LG-MOB9-012", brand: "LG", category: "Climatiseurs", price: 62000, stock: 15, status: "active", image: IMAGES.ac, energy: "A", specs: "9000 BTU, Portable, Timer", description: "Climatiseur mobile compact pour les petits espaces, avec minuterie programmable.", createdAt: "2026-03-22" },
-];
-
-const CATEGORIES_LIST = ["Tous", "Réfrigérateurs", "Machines à laver", "Fours", "Climatiseurs", "Lave-vaisselle", "Aspirateurs", "Petit électroménager", "TV & Son"];
-const BRANDS_LIST = ["Samsung", "LG", "Bosch", "Siemens", "Miele", "De'Longhi", "Roborock", "Whirlpool"];
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
   active: { label: "Actif", color: "#10B981", bg: "#10B981" },
   draft: { label: "Brouillon", color: "#F59E0B", bg: "#F59E0B" },
@@ -55,34 +29,80 @@ function formatPrice(price: number) {
 // ─── Product Form Modal ───
 function ProductFormModal({
   product,
+  brands,
+  categories,
   onClose,
   onSave,
 }: {
   product: AdminProduct | null;
+  brands: BrandRef[];
+  categories: CategoryRef[];
   onClose: () => void;
-  onSave: (p: AdminProduct) => void;
+  onSave: (data: FormData, id?: number) => Promise<void>;
 }) {
   const isEdit = !!product;
-  const [form, setForm] = useState<AdminProduct>(
-    product || {
-      id: "P" + String(Date.now()).slice(-4),
-      name: "",
-      sku: "",
-      brand: "Samsung",
-      category: "Réfrigérateurs",
-      price: 0,
-      oldPrice: undefined,
-      stock: 0,
-      status: "draft",
-      image: IMAGES.fridge,
-      energy: "A+",
-      specs: "",
-      description: "",
-      createdAt: new Date().toISOString().slice(0, 10),
-    }
-  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const set = (key: keyof AdminProduct, value: any) => setForm({ ...form, [key]: value });
+  const [form, setForm] = useState({
+    name: product?.name || "",
+    sku: product?.sku || "",
+    brand_id: product?.brand_id || (brands.length > 0 ? brands[0].id : 0),
+    category_id: product?.category_id || (categories.length > 0 ? categories[0].id : 0),
+    price: product?.price?.toString() || "",
+    oldPrice: product?.oldPrice?.toString() || "",
+    stock: product?.stock?.toString() || "0",
+    status: product?.status || "active",
+    energy: product?.energy || "A+",
+    specs: product?.specs || "",
+    description: product?.description || "",
+  });
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(product?.image || null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const set = (key: keyof typeof form, value: any) => setForm({ ...form, [key]: value });
+
+  const handleSubmit = async () => {
+    if (!form.name || !form.price || !form.brand_id || !form.category_id) {
+      toast.error("Veuillez remplir tous les champs obligatoires");
+      return;
+    }
+
+    const data = new FormData();
+    data.append("name", form.name);
+    data.append("sku", form.sku);
+    data.append("brand_id", form.brand_id.toString());
+    data.append("category_id", form.category_id.toString());
+    data.append("price", form.price);
+    if (form.oldPrice) data.append("oldPrice", form.oldPrice);
+    data.append("stock", form.stock);
+    data.append("status", form.status);
+    data.append("energy", form.energy);
+    data.append("specs", form.specs);
+    data.append("description", form.description);
+
+    if (imageFile) {
+      data.append("image_file", imageFile);
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSave(data, product?.id);
+    } catch (e: any) {
+      toast.error(e.message || "Erreur de sauvegarde");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[100] flex items-start justify-center pt-10 overflow-y-auto" onClick={onClose}>
@@ -103,11 +123,11 @@ function ProductFormModal({
 
         {/* Body */}
         <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
-          {/* Image Preview */}
+          {/* Image Upload */}
           <div className="flex items-center gap-4">
             <div className="w-20 h-20 rounded-xl bg-[#F3F4F6] dark:bg-white/10 overflow-hidden shrink-0">
-              {form.image ? (
-                <img src={form.image} alt="" className="w-full h-full object-cover" />
+              {imagePreview ? (
+                <img src={imagePreview} alt="Aperçu" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-[#9CA3AF]">
                   <ImageIcon className="w-8 h-8" />
@@ -115,11 +135,21 @@ function ProductFormModal({
               )}
             </div>
             <div className="flex-1">
-              <button className="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-[#D1D5DB] dark:border-white/20 text-[13px] text-[#6B7280] hover:border-[#FF6B35] hover:text-[#FF6B35] transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-[#D1D5DB] dark:border-white/20 text-[13px] text-[#6B7280] hover:border-[#FF6B35] hover:text-[#FF6B35] transition-colors"
+              >
                 <Upload className="w-4 h-4" />
-                Changer l'image
+                {imageFile ? imageFile.name : "Télécharger une image"}
               </button>
-              <p className="text-[11px] text-[#9CA3AF] mt-1">PNG, JPG — Max 2MB</p>
+              <p className="text-[11px] text-[#9CA3AF] mt-1">PNG, JPG, WEBP — Max 2MB</p>
             </div>
           </div>
 
@@ -130,7 +160,7 @@ function ProductFormModal({
               <input value={form.name} onChange={(e) => set("name", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="Ex: Réfrigérateur Multi-Portes" />
             </div>
             <div>
-              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>SKU *</label>
+              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>SKU</label>
               <input value={form.sku} onChange={(e) => set("sku", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="Ex: SAM-RF23-001" />
             </div>
           </div>
@@ -138,15 +168,15 @@ function ProductFormModal({
           {/* Brand + Category */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Marque</label>
-              <select value={form.brand} onChange={(e) => set("brand", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors">
-                {BRANDS_LIST.map((b) => <option key={b} value={b}>{b}</option>)}
+              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Marque *</label>
+              <select value={form.brand_id} onChange={(e) => set("brand_id", Number(e.target.value))} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors">
+                {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Catégorie</label>
-              <select value={form.category} onChange={(e) => set("category", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors">
-                {CATEGORIES_LIST.filter((c) => c !== "Tous").map((c) => <option key={c} value={c}>{c}</option>)}
+              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Catégorie *</label>
+              <select value={form.category_id} onChange={(e) => set("category_id", Number(e.target.value))} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors">
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
           </div>
@@ -155,15 +185,15 @@ function ProductFormModal({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Prix (DA) *</label>
-              <input type="number" value={form.price || ""} onChange={(e) => set("price", Number(e.target.value))} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="189000" />
+              <input type="number" value={form.price} onChange={(e) => set("price", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="189000" />
             </div>
             <div>
               <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Ancien prix (DA)</label>
-              <input type="number" value={form.oldPrice || ""} onChange={(e) => set("oldPrice", e.target.value ? Number(e.target.value) : undefined)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="232000" />
+              <input type="number" value={form.oldPrice} onChange={(e) => set("oldPrice", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="232000" />
             </div>
             <div>
               <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Stock</label>
-              <input type="number" value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="24" />
+              <input type="number" value={form.stock} onChange={(e) => set("stock", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="24" />
             </div>
           </div>
 
@@ -177,7 +207,7 @@ function ProductFormModal({
             </div>
             <div>
               <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Statut</label>
-              <select value={form.status} onChange={(e) => set("status", e.target.value as any)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors">
+              <select value={form.status} onChange={(e) => set("status", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors">
                 <option value="active">Actif</option>
                 <option value="draft">Brouillon</option>
                 <option value="outofstock">Rupture de stock</option>
@@ -200,15 +230,17 @@ function ProductFormModal({
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 p-6 border-t border-[#E5E7EB] dark:border-white/10">
-          <button onClick={onClose} className="px-5 py-2.5 rounded-lg text-[13px] text-[#6B7280] hover:bg-[#F3F4F6] dark:hover:bg-white/5 transition-colors" style={{ fontWeight: 500 }}>
+          <button onClick={onClose} disabled={isSubmitting} className="px-5 py-2.5 rounded-lg text-[13px] text-[#6B7280] hover:bg-[#F3F4F6] dark:hover:bg-white/5 transition-colors disabled:opacity-50" style={{ fontWeight: 500 }}>
             Annuler
           </button>
           <button
-            onClick={() => onSave(form)}
-            className="px-5 py-2.5 rounded-lg bg-[#FF6B35] text-white text-[13px] hover:bg-[#E55A2B] transition-colors"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#FF6B35] text-white text-[13px] hover:bg-[#E55A2B] transition-colors disabled:opacity-50"
             style={{ fontWeight: 500 }}
           >
-            {isEdit ? "Mettre à jour" : "Ajouter le produit"}
+            {isSubmitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+            {isEdit ? "Mettre à jour" : "Ajouter"}
           </button>
         </div>
       </div>
@@ -218,6 +250,8 @@ function ProductFormModal({
 
 // ─── Delete Confirm Modal ───
 function DeleteModal({ product, onClose, onConfirm }: { product: AdminProduct; onClose: () => void; onConfirm: () => void }) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
   return (
     <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center" onClick={onClose}>
       <div className="bg-white dark:bg-[#1E1E24] rounded-2xl w-full max-w-sm p-6 m-4 shadow-2xl" style={{ fontFamily: "'Sora', sans-serif" }} onClick={(e) => e.stopPropagation()}>
@@ -229,8 +263,19 @@ function DeleteModal({ product, onClose, onConfirm }: { product: AdminProduct; o
           « {product.name} » sera définitivement supprimé. Cette action est irréversible.
         </p>
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg text-[13px] border border-[#E5E7EB] dark:border-white/10 text-[#6B7280] hover:bg-[#F3F4F6] dark:hover:bg-white/5 transition-colors" style={{ fontWeight: 500 }}>Annuler</button>
-          <button onClick={onConfirm} className="flex-1 py-2.5 rounded-lg bg-[#EF4444] text-white text-[13px] hover:bg-[#DC2626] transition-colors" style={{ fontWeight: 500 }}>Supprimer</button>
+          <button onClick={onClose} disabled={isDeleting} className="flex-1 py-2.5 rounded-lg text-[13px] border border-[#E5E7EB] dark:border-white/10 text-[#6B7280] hover:bg-[#F3F4F6] transition-colors disabled:opacity-50" style={{ fontWeight: 500 }}>Annuler</button>
+          <button 
+            onClick={async () => {
+              setIsDeleting(true);
+              await onConfirm();
+              setIsDeleting(false);
+            }} 
+            disabled={isDeleting}
+            className="flex items-center justify-center gap-2 flex-1 py-2.5 rounded-lg bg-[#EF4444] text-white text-[13px] hover:bg-[#DC2626] transition-colors disabled:opacity-50" 
+            style={{ fontWeight: 500 }}
+          >
+            {isDeleting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "Supprimer"}
+          </button>
         </div>
       </div>
     </div>
@@ -239,9 +284,13 @@ function DeleteModal({ product, onClose, onConfirm }: { product: AdminProduct; o
 
 // ─── Main Page ───
 export function AdminProducts() {
-  const [products, setProducts] = useState<AdminProduct[]>(MOCK_PRODUCTS);
+  const [products, setProducts] = useState<AdminProduct[]>([]);
+  const [brands, setBrands] = useState<BrandRef[]>([]);
+  const [categories, setCategories] = useState<CategoryRef[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("Tous");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortField, setSortField] = useState<"name" | "price" | "stock" | "createdAt">("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -249,25 +298,43 @@ export function AdminProducts() {
   const [page, setPage] = useState(1);
   const [formModal, setFormModal] = useState<{ open: boolean; product: AdminProduct | null }>({ open: false, product: null });
   const [deleteModal, setDeleteModal] = useState<AdminProduct | null>(null);
-  const [actionMenu, setActionMenu] = useState<string | null>(null);
+  const [actionMenu, setActionMenu] = useState<number | null>(null);
   const perPage = 8;
+
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [prods, refs] = await Promise.all([getProducts(), getReferences()]);
+      setProducts(prods);
+      setBrands(refs.brands);
+      setCategories(refs.categories);
+    } catch (e: any) {
+      toast.error(e.message || "Impossible de charger les données.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const filtered = useMemo(() => {
     let list = [...products];
-    if (search) list = list.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()) || p.brand.toLowerCase().includes(search.toLowerCase()));
-    if (categoryFilter !== "Tous") list = list.filter((p) => p.category === categoryFilter);
+    if (search) list = list.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku && p.sku.toLowerCase().includes(search.toLowerCase())) || (p.brand && p.brand.toLowerCase().includes(search.toLowerCase())));
+    if (categoryFilter !== "all") list = list.filter((p) => p.category_id.toString() === categoryFilter);
     if (statusFilter !== "all") list = list.filter((p) => p.status === statusFilter);
     list.sort((a, b) => {
       const m = sortDir === "asc" ? 1 : -1;
       if (sortField === "name") return a.name.localeCompare(b.name) * m;
       if (sortField === "price") return (a.price - b.price) * m;
       if (sortField === "stock") return (a.stock - b.stock) * m;
-      return a.createdAt.localeCompare(b.createdAt) * m;
+      return (a.createdAt || "").localeCompare(b.createdAt || "") * m;
     });
     return list;
   }, [products, search, categoryFilter, statusFilter, sortField, sortDir]);
 
-  const totalPages = Math.ceil(filtered.length / perPage);
+  const totalPages = Math.ceil(filtered.length / perPage) || 1;
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
   const toggleSort = (field: typeof sortField) => {
@@ -275,25 +342,47 @@ export function AdminProducts() {
     else { setSortField(field); setSortDir("asc"); }
   };
 
-  const handleSave = (p: AdminProduct) => {
-    if (formModal.product) {
-      setProducts((prev) => prev.map((x) => (x.id === p.id ? p : x)));
-    } else {
-      setProducts((prev) => [p, ...prev]);
+  const handleSaveProduct = async (data: FormData, id?: number) => {
+    try {
+      if (id) {
+        await updateProduct(id, data);
+        toast.success("Produit mis à jour avec succès");
+      } else {
+        await createProduct(data);
+        toast.success("Produit ajouté avec succès");
+      }
+      setFormModal({ open: false, product: null });
+      loadData(); // Recharger les produits depuis l'API
+    } catch (e: any) {
+      toast.error(e.message || "Erreur lors de la sauvegarde du produit.");
+      throw e; // Important for Modal to keep spinner or stop it
     }
-    setFormModal({ open: false, product: null });
   };
 
-  const handleDelete = () => {
+  const handleDeleteProduct = async () => {
     if (deleteModal) {
-      setProducts((prev) => prev.filter((x) => x.id !== deleteModal.id));
-      setDeleteModal(null);
+      try {
+        await deleteProduct(deleteModal.id);
+        toast.success("Produit supprimé");
+        setDeleteModal(null);
+        loadData();
+      } catch (e: any) {
+        toast.error(e.message || "Erreur lors de la suppression.");
+      }
     }
   };
 
   const activeCount = products.filter((p) => p.status === "active").length;
   const draftCount = products.filter((p) => p.status === "draft").length;
   const oosCount = products.filter((p) => p.status === "outofstock").length;
+
+  if (isLoading && products.length === 0) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[#E8400C] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5" style={{ fontFamily: "'Sora', sans-serif" }}>
@@ -328,7 +417,8 @@ export function AdminProducts() {
             </div>
             {/* Category Filter */}
             <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }} className="px-3 py-2 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors">
-              {CATEGORIES_LIST.map((c) => <option key={c} value={c}>{c}</option>)}
+              <option value="all">Toutes les catégories</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             {/* Status Filter */}
             <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="px-3 py-2 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors">
@@ -383,15 +473,21 @@ export function AdminProducts() {
                 {paginated.map((p) => {
                   const st = STATUS_MAP[p.status];
                   return (
-                    <tr key={p.id} className="border-b border-[#E5E7EB]/50 dark:border-white/5 hover:bg-[#F9FAFB] dark:hover:bg-white/5 transition-colors">
+                    <tr key={p.id} className="group border-b border-[#E5E7EB]/50 dark:border-white/5 hover:bg-[#F9FAFB] dark:hover:bg-white/5 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg bg-[#F3F4F6] dark:bg-white/10 overflow-hidden shrink-0">
-                            <img src={p.image} alt="" className="w-full h-full object-cover" />
+                            {p.image ? (
+                              <img src={p.image} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-[#9CA3AF]">
+                                <ImageIcon className="w-5 h-5" />
+                              </div>
+                            )}
                           </div>
                           <div>
                             <p className="text-[#1A2332] dark:text-white truncate max-w-[220px]" style={{ fontWeight: 500 }}>{p.name}</p>
-                            <p className="text-[11px] text-[#9CA3AF]">{p.brand} · {p.sku}</p>
+                            <p className="text-[11px] text-[#9CA3AF]">{p.brand || "-"} · {p.sku || "-"}</p>
                           </div>
                         </div>
                       </td>
@@ -405,31 +501,28 @@ export function AdminProducts() {
                         </span>
                         {p.stock > 0 && p.stock < 10 && <span className="text-[10px] text-[#F59E0B] ml-1">Faible</span>}
                       </td>
-                      <td className="px-4 py-3 text-[#6B7280] dark:text-white/60">{p.category}</td>
+                      <td className="px-4 py-3 text-[#6B7280] dark:text-white/60">{p.category || "-"}</td>
                       <td className="px-4 py-3">
                         <span className="inline-flex px-2.5 py-0.5 rounded-full text-[11px]" style={{ fontWeight: 500, backgroundColor: st.bg + "15", color: st.color }}>
                           {st.label}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="relative">
-                          <button onClick={() => setActionMenu(actionMenu === p.id ? null : p.id)} className="w-8 h-8 rounded-lg hover:bg-[#F3F4F6] dark:hover:bg-white/10 flex items-center justify-center text-[#9CA3AF] hover:text-[#6B7280]">
-                            <MoreVertical className="w-4 h-4" />
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => setFormModal({ open: true, product: p })}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-[#FF6B35]/10 hover:text-[#FF6B35] transition-colors"
+                            title="Modifier"
+                          >
+                            <Edit2 className="w-4 h-4" />
                           </button>
-                          {actionMenu === p.id && (
-                            <div className="absolute right-0 top-9 bg-white dark:bg-[#25252B] rounded-xl shadow-xl border border-[#E5E7EB] dark:border-white/10 py-1 z-50 min-w-[150px]">
-                              <button onClick={() => { setFormModal({ open: true, product: p }); setActionMenu(null); }} className="w-full flex items-center gap-2 px-4 py-2 text-[12px] text-[#6B7280] hover:bg-[#F9FAFB] dark:hover:bg-white/5 transition-colors">
-                                <Edit2 className="w-3.5 h-3.5" /> Modifier
-                              </button>
-                              <button className="w-full flex items-center gap-2 px-4 py-2 text-[12px] text-[#6B7280] hover:bg-[#F9FAFB] dark:hover:bg-white/5 transition-colors">
-                                <Eye className="w-3.5 h-3.5" /> Voir
-                              </button>
-                              <div className="border-t border-[#E5E7EB] dark:border-white/10 my-1" />
-                              <button onClick={() => { setDeleteModal(p); setActionMenu(null); }} className="w-full flex items-center gap-2 px-4 py-2 text-[12px] text-[#EF4444] hover:bg-[#EF4444]/5 transition-colors">
-                                <Trash2 className="w-3.5 h-3.5" /> Supprimer
-                              </button>
-                            </div>
-                          )}
+                          <button
+                            onClick={() => setDeleteModal(p)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-[#EF4444]/10 hover:text-[#EF4444] transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -438,7 +531,6 @@ export function AdminProducts() {
               </tbody>
             </table>
           </div>
-
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-[#E5E7EB] dark:border-white/10">
@@ -467,7 +559,13 @@ export function AdminProducts() {
             return (
               <div key={p.id} className="bg-white dark:bg-[#1E1E24] rounded-xl border border-[#E5E7EB] dark:border-white/10 overflow-hidden group">
                 <div className="relative h-40 bg-[#F3F4F6] dark:bg-white/5">
-                  <img src={p.image} alt="" className="w-full h-full object-cover" />
+                  {p.image ? (
+                    <img src={p.image} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[#9CA3AF]">
+                      <ImageIcon className="w-8 h-8" />
+                    </div>
+                  )}
                   <span className="absolute top-2 left-2 inline-flex px-2 py-0.5 rounded-full text-[10px]" style={{ fontWeight: 500, backgroundColor: st.bg + "20", color: st.color, backdropFilter: "blur(8px)" }}>
                     {st.label}
                   </span>
@@ -481,7 +579,7 @@ export function AdminProducts() {
                   </div>
                 </div>
                 <div className="p-3">
-                  <p className="text-[12px] text-[#9CA3AF]">{p.brand} · {p.sku}</p>
+                  <p className="text-[12px] text-[#9CA3AF]">{p.brand || "-"} · {p.sku || "-"}</p>
                   <p className="text-[13px] text-[#1A2332] dark:text-white mt-0.5 truncate" style={{ fontWeight: 500 }}>{p.name}</p>
                   <div className="flex items-center justify-between mt-2">
                     <p className="text-[14px] text-[#FF6B35]" style={{ fontWeight: 700 }}>{formatPrice(p.price)}</p>
@@ -496,7 +594,7 @@ export function AdminProducts() {
 
       {/* Pagination for grid */}
       {viewMode === "grid" && totalPages > 1 && (
-        <div className="flex items-center justify-center gap-1">
+        <div className="flex items-center justify-center gap-1 mt-4">
           <button disabled={page === 1} onClick={() => setPage(page - 1)} className="w-8 h-8 rounded-lg border border-[#E5E7EB] dark:border-white/10 flex items-center justify-center text-[#9CA3AF] disabled:opacity-30">
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -512,8 +610,8 @@ export function AdminProducts() {
       )}
 
       {/* Modals */}
-      {formModal.open && <ProductFormModal product={formModal.product} onClose={() => setFormModal({ open: false, product: null })} onSave={handleSave} />}
-      {deleteModal && <DeleteModal product={deleteModal} onClose={() => setDeleteModal(null)} onConfirm={handleDelete} />}
+      {formModal.open && <ProductFormModal product={formModal.product} brands={brands} categories={categories} onClose={() => setFormModal({ open: false, product: null })} onSave={handleSaveProduct} />}
+      {deleteModal && <DeleteModal product={deleteModal} onClose={() => setDeleteModal(null)} onConfirm={handleDeleteProduct} />}
     </div>
   );
 }

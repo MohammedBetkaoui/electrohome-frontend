@@ -9,6 +9,8 @@ const headers = () => ({
   Accept: "application/json",
 });
 
+export const getToken = () => localStorage.getItem("eh_token");
+
 export interface AuthUser {
   id: number;
   first_name: string;
