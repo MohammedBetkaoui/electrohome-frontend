@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { ShoppingCart, Heart, User, Sun, Moon, Search, Menu, X, Home, Grid3X3, Package, Shield } from "lucide-react";
+import { ShoppingCart, Heart, User, Sun, Moon, Search, Menu, X, Home, Grid3X3, Package, Shield, LogOut } from "lucide-react";
 import { useStore } from "../data/store";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "sonner";
+
 
 export function Header() {
   const { cart, darkMode, toggleDarkMode, searchQuery, setSearchQuery } = useStore();
@@ -9,6 +12,17 @@ export function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
+  const { user, isAuthenticated, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    toast.success("Déconnexion réussie");
+    navigate("/");
+  };
+
+  const initials = user
+    ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase()
+    : "??";
 
   const navLinks = [
     { to: "/", label: "Accueil" },
@@ -70,14 +84,37 @@ export function Header() {
                   </span>
                 )}
               </Link>
-              <Link to="/auth" className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm hover:opacity-90 transition-opacity">
-                <User className="w-4 h-4" />
-                Mon compte
-              </Link>
-               <Link to="/admin" className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg border border-[#FF6B35]/30 text-[#FF6B35] text-sm hover:bg-[#FF6B35] hover:text-white transition-colors">
-                <Shield className="w-4 h-4" />
-                Admin
-              </Link>
+              {isAuthenticated ? (
+                <div className="hidden sm:flex items-center gap-2">
+                  <Link
+                    to="/compte"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-[#E8400C] text-white flex items-center justify-center text-xs font-bold">
+                      {initials}
+                    </div>
+                    <span className="font-medium">{user?.first_name}</span>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-red-100 text-red-500 transition-colors"
+                    title="Déconnexion"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                  {user?.is_admin && (
+                    <Link to="/admin" className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#FF6B35]/30 text-[#FF6B35] text-sm hover:bg-[#FF6B35] hover:text-white transition-colors">
+                      <Shield className="w-4 h-4" />
+                      Admin
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <Link to="/auth" className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm hover:opacity-90 transition-opacity">
+                  <User className="w-4 h-4" />
+                  Se connecter
+                </Link>
+              )}
               <button onClick={() => setMenuOpen(!menuOpen)} className="lg:hidden w-9 h-9 rounded-lg flex items-center justify-center hover:bg-muted transition-colors">
                 {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
@@ -111,12 +148,25 @@ export function Header() {
                   {l.label}
                 </Link>
               ))}
-              <Link to="/auth" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 rounded-lg text-sm text-[#E8400C]">
-                Mon compte
-              </Link>
-              <Link to="/admin" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 rounded-lg text-sm text-[#FF6B35]">
-                🔧 Administration
-              </Link>
+              {isAuthenticated ? (
+                <>
+                  <Link to="/compte" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 rounded-lg text-sm text-[#E8400C] font-medium">
+                    👤 {user?.full_name}
+                  </Link>
+                  <button onClick={() => { handleLogout(); setMenuOpen(false); }} className="block w-full text-left px-4 py-2.5 rounded-lg text-sm text-red-500">
+                    Déconnexion
+                  </button>
+                  {user?.is_admin && (
+                    <Link to="/admin" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 rounded-lg text-sm text-[#FF6B35]">
+                      🔧 Administration
+                    </Link>
+                  )}
+                </>
+              ) : (
+                <Link to="/auth" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 rounded-lg text-sm text-[#E8400C]">
+                  Se connecter
+                </Link>
+              )}
             </nav>
           </div>
         )}

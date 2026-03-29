@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LayoutDashboard, Package, Heart, MapPin, MessageSquare, Settings, LogOut, ChevronRight } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { PRODUCTS, useStore } from "../data/store";
 import { ProductCard } from "../components/ProductCard";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "sonner";
 
 const sideNav = [
   { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
@@ -16,7 +18,32 @@ const sideNav = [
 export function AccountPage() {
   const [active, setActive] = useState("dashboard");
   const { favorites } = useStore();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const navigate = useNavigate();
   const favProducts = PRODUCTS.filter((p) => favorites.includes(p.id));
+
+  // Redirection si non connecté
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      navigate("/auth");
+    }
+  }, [isLoading, isAuthenticated, navigate]);
+
+  const handleLogout = async () => {
+    await logout();
+    toast.success("Déconnexion réussie");
+    navigate("/");
+  };
+
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[#E8400C] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const initials = `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-20 py-8">
@@ -25,10 +52,12 @@ export function AccountPage() {
         <aside className="lg:w-64 shrink-0">
           <div className="p-4 rounded-xl bg-card border border-border mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#E8400C] text-white flex items-center justify-center text-sm" style={{ fontWeight: 600 }}>JD</div>
+              <div className="w-10 h-10 rounded-full bg-[#E8400C] text-white flex items-center justify-center text-sm" style={{ fontWeight: 600 }}>
+                {initials}
+              </div>
               <div>
-                <p className="text-sm" style={{ fontWeight: 600 }}>Jean Dupont</p>
-                <p className="text-xs text-muted-foreground">jean.dupont@email.com</p>
+                <p className="text-sm" style={{ fontWeight: 600 }}>{user.full_name}</p>
+                <p className="text-xs text-muted-foreground">{user.email}</p>
               </div>
             </div>
           </div>
@@ -43,7 +72,7 @@ export function AccountPage() {
                 <n.icon className="w-4 h-4" />{n.label}
               </button>
             ))}
-            <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors">
+            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors">
               <LogOut className="w-4 h-4" />Déconnexion
             </button>
           </nav>
@@ -53,7 +82,7 @@ export function AccountPage() {
         <div className="flex-1">
           {active === "dashboard" && (
             <div className="space-y-6">
-              <h1 className="text-xl" style={{ fontWeight: 600 }}>Bienvenue, Jean !</h1>
+              <h1 className="text-xl" style={{ fontWeight: 600 }}>Bienvenue, {user.first_name} ! 👋</h1>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-5 rounded-xl bg-card border border-border">
                   <p className="text-xs text-muted-foreground mb-1">Dernière commande</p>
@@ -145,9 +174,9 @@ export function AccountPage() {
               <h2 className="text-xl" style={{ fontWeight: 600 }}>Paramètres</h2>
               <div className="space-y-4">
                 {[
-                  { label: "Prénom", value: "Jean" },
-                  { label: "Nom", value: "Dupont" },
-                  { label: "Email", value: "jean.dupont@email.com" },
+                  { label: "Prénom", value: user.first_name },
+                  { label: "Nom", value: user.last_name },
+                  { label: "Email", value: user.email },
                 ].map((f) => (
                   <div key={f.label}>
                     <label className="text-sm mb-1 block">{f.label}</label>
