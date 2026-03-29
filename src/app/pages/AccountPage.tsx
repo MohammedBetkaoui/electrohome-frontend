@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { LayoutDashboard, Package, Heart, MapPin, MessageSquare, Settings, LogOut, ChevronRight } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { PRODUCTS, useStore } from "../data/store";
@@ -18,16 +18,9 @@ const sideNav = [
 export function AccountPage() {
   const [active, setActive] = useState("dashboard");
   const { favorites } = useStore();
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const favProducts = PRODUCTS.filter((p) => favorites.includes(p.id));
-
-  // Redirection si non connecté
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate("/auth");
-    }
-  }, [isLoading, isAuthenticated, navigate]);
 
   const handleLogout = async () => {
     await logout();
@@ -35,15 +28,12 @@ export function AccountPage() {
     navigate("/");
   };
 
-  if (isLoading || !user) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#E8400C] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  // AuthGuard garantit que user n'est jamais null ici.
+  // Ce guard satisfait TypeScript sans casser le runtime.
+  if (!user) return null;
 
   const initials = `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
+
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-20 py-8">

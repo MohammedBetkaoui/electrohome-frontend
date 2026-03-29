@@ -39,6 +39,11 @@ import { AdminImportExport } from "./pages/admin/AdminImportExport";
 import { AdminNotifications } from "./pages/admin/AdminNotifications";
 import { AdminPromotions } from "./pages/admin/AdminPromotions";
 
+// ── Guards ──────────────────────────────────────────────────
+import { GuestGuard } from "./components/guards/GuestGuard";
+import { AuthGuard } from "./components/guards/AuthGuard";
+import { AdminGuard } from "./components/guards/AdminGuard";
+
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -49,7 +54,6 @@ export const router = createBrowserRouter([
       { path: "produit/:slug", Component: ProductPage },
       { path: "panier", Component: CartPage },
       { path: "commande", Component: CheckoutPage },
-      { path: "compte", Component: AccountPage },
       { path: "recherche", Component: SearchPage },
       { path: "marques", Component: BrandsPage },
       { path: "promotions", Component: PromotionsPage },
@@ -58,13 +62,39 @@ export const router = createBrowserRouter([
       { path: "a-propos", Component: AboutPage },
       { path: "contact", Component: ContactPage },
       { path: "faq", Component: FaqPage },
-      { path: "auth", Component: AuthPage },
+
+      // ── Route protégée : compte (connecté uniquement) ───────
+      {
+        path: "compte",
+        element: (
+          <AuthGuard>
+            <AccountPage />
+          </AuthGuard>
+        ),
+      },
+
+      // ── Route invité : auth (non connecté uniquement) ────────
+      {
+        path: "auth",
+        element: (
+          <GuestGuard>
+            <AuthPage />
+          </GuestGuard>
+        ),
+      },
+
       { path: "*", Component: NotFoundPage },
     ],
   },
+
+  // ── Routes admin (connecté ET rôle admin uniquement) ─────────
   {
     path: "/admin",
-    Component: AdminLayout,
+    element: (
+      <AdminGuard>
+        <AdminLayout />
+      </AdminGuard>
+    ),
     children: [
       { index: true, Component: AdminDashboard },
       { path: "analytics", Component: AdminAnalytics },
@@ -91,3 +121,4 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
+
