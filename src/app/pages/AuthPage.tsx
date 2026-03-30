@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Truck, ShieldCheck, RefreshCw } from "lucide-react";
 import { IMAGES } from "../data/store";
 import { useAuth } from "../context/AuthContext";
 import { apiLogin, apiRegister } from "../api/auth";
@@ -110,60 +110,65 @@ export function AuthPage() {
     }`;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex">
-      {/* ── Côté gauche (visuel) ─────────────────── */}
-      <div className="hidden lg:block lg:w-1/2 relative">
-        <img
-          src={IMAGES.kitchen}
-          alt=""
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#1A1A2E]/90 to-[#1A1A2E]/40 flex items-center">
-          <div className="px-12 max-w-md">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-[#E8400C] flex items-center justify-center">
-                <span className="text-white text-sm font-bold">EH</span>
-              </div>
-              <span className="text-white text-lg font-semibold">
-                ElectroHome
-              </span>
-            </div>
-            <h2 className="text-white text-3xl font-bold mb-3">
-              {tab === "login"
-                ? "Content de vous revoir !"
-                : "Bienvenue chez ElectroHome"}
-            </h2>
-            <p className="text-white/70">
-              {tab === "login"
-                ? "Connectez-vous pour accéder à vos commandes, favoris et bien plus encore."
-                : "Créez votre compte pour profiter de nos offres exclusives, suivre vos commandes et gérer vos favoris."}
-            </p>
+    <div className="min-h-[calc(100vh-4rem)] flex font-['Inter'] relative bg-[#12121A]">
+      {/* Arrière-plan global */}
+      <img
+        src={IMAGES.kitchen}
+        alt="Background"
+        className="absolute inset-0 w-full h-full object-cover opacity-[0.15] mix-blend-screen"
+      />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0B0B13]/90 via-[#12121A]/80 to-[#1A1A24]/90 z-0" />
 
-            {/* Avantages */}
-            <div className="mt-8 space-y-3">
-              {[
-                "🚚 Livraison gratuite dès 70 000 DA",
-                "🔒 Paiement 100% sécurisé",
-                "🔄 Retours gratuits sous 14 jours",
-              ].map((item) => (
-                <div key={item} className="flex items-center gap-2">
-                  <span className="text-white/90 text-sm">{item}</span>
-                </div>
-              ))}
+      {/* ── Côté gauche (visuel) ─────────────────── */}
+      <div className="hidden lg:flex lg:w-1/2 relative z-10 flex-col items-center justify-center">
+        <div className="px-14 w-full max-w-[550px]">
+          <div className="flex items-center gap-3 mb-10">
+            <img src="/logo.png" alt="ElectroHome" className="h-12 object-contain drop-shadow-lg brightness-200" />
+          </div>
+          <h2 className="text-white text-5xl font-extrabold mb-5 tracking-tight leading-[1.1] drop-shadow-md">
+            {tab === "login"
+              ? "Content de vous revoir !"
+              : "Créez votre compte"}
+          </h2>
+          <p className="text-[#D1D5DB] text-lg leading-relaxed mb-12 max-w-md">
+            {tab === "login"
+              ? "Connectez-vous pour accéder à vos commandes, vos produits favoris et bien plus encore."
+              : "Rejoignez-nous pour profiter d'offres exclusives et accélérer vos achats."}
+          </p>
+
+          {/* Avantages */}
+          <div className="space-y-4 bg-white/[0.03] backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl block">
+            <div className="flex items-center gap-5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#E8400C]/20 to-[#E8400C]/5 flex items-center justify-center shrink-0 border border-[#E8400C]/20 shadow-[0_0_15px_rgba(232,64,12,0.15)]">
+                <Truck className="w-6 h-6 text-[#E8400C]" />
+              </div>
+              <span className="text-white/95 text-[15px] font-medium tracking-wide">Livraison gratuite dès 70 000 DA</span>
+            </div>
+            <div className="flex items-center gap-5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#10B981]/20 to-[#10B981]/5 flex items-center justify-center shrink-0 border border-[#10B981]/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                <ShieldCheck className="w-6 h-6 text-[#10B981]" />
+              </div>
+              <span className="text-white/95 text-[15px] font-medium tracking-wide">Paiement 100% sécurisé</span>
+            </div>
+            <div className="flex items-center gap-5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#3B82F6]/20 to-[#3B82F6]/5 flex items-center justify-center shrink-0 border border-[#3B82F6]/20 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+                <RefreshCw className="w-6 h-6 text-[#3B82F6]" />
+              </div>
+              <span className="text-white/95 text-[15px] font-medium tracking-wide">Retours gratuits sous 14 jours</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* ── Côté droit (formulaire) ──────────────── */}
-      <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
-        <div className="w-full max-w-md py-8">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 overflow-y-auto relative z-10">
+        <div className="w-full max-w-[480px] bg-white dark:bg-[#1A1A24]/80 dark:backdrop-blur-3xl p-8 sm:p-10 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-black/5 dark:border-white/10 relative overflow-hidden">
+          {/* subtle glow behind form */}
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#E8400C]/10 rounded-full blur-[100px] pointer-events-none" />
+          
           {/* Logo mobile */}
-          <div className="flex lg:hidden items-center gap-2 mb-6">
-            <div className="w-9 h-9 rounded-lg bg-[#E8400C] flex items-center justify-center">
-              <span className="text-white text-xs font-bold">EH</span>
-            </div>
-            <span className="font-semibold">ElectroHome</span>
+          <div className="flex lg:hidden justify-center items-center mb-8 drop-shadow-sm">
+            <img src="/logo.png" alt="ElectroHome" className="h-10 object-contain dark:brightness-200" />
           </div>
 
           {/* Tabs */}
