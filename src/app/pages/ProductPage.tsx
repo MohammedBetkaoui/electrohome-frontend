@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router";
+import { useParams, Link, useNavigate } from "react-router";
 import { ChevronRight, Star, Heart, Share2, Truck, Shield, Minus, Plus, ShoppingCart, Zap } from "lucide-react";
+import { toast } from "sonner";
 import { ProductCard } from "../components/ProductCard";
 import { getCatalogProduct, getCatalogProducts } from "../api/products";
 import { PRODUCTS, formatPrice, useStore } from "../data/store";
@@ -35,6 +36,7 @@ function ProductPageSkeleton() {
 
 export function ProductPage() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const staticProduct = PRODUCTS.find((product) => product.slug === slug || product.id === slug) || null;
   const { addToCart, favorites, toggleFavorite } = useStore();
   const [remoteProduct, setRemoteProduct] = useState<Product | null>(null);
@@ -107,6 +109,17 @@ export function ProductPage() {
   }, [slug, staticProduct]);
 
   const product = staticProduct || remoteProduct;
+  const availableStock = typeof product?.stock === "number" ? Math.max(0, Math.floor(product.stock)) : null;
+  const isOutOfStock = availableStock !== null && availableStock <= 0;
+
+  useEffect(() => {
+    if (availableStock === null || availableStock <= 0) {
+      setQuantity(1);
+      return;
+    }
+
+    setQuantity((currentQuantity) => Math.min(currentQuantity, availableStock));
+  }, [availableStock, product?.id]);
 
   if (loading) {
     return <ProductPageSkeleton />;
@@ -132,6 +145,30 @@ export function ProductPage() {
   const currentImage = productImages[selectedImage] || product.image;
   const specsList = product.specs.split(", ").filter(Boolean);
   const displayedRelatedProducts = relatedProducts.filter((item) => item.id !== product.id).slice(0, 4);
+  const maxQuantityReached = availableStock !== null && availableStock > 0 && quantity >= availableStock;
+
+  const handleAddToCart = () => {
+    const result = addToCart(product, quantity);
+
+    if (result.reason === "out_of_stock") {
+      toast.error("Ce produit est actuellement hors stock.");
+      return false;
+    }
+
+    if (result.reason === "max_stock_reached") {
+      toast.info(`Quantite ajustee au stock disponible : ${result.quantity}.`);
+      return true;
+    }
+
+    toast.success(quantity > 1 ? `${quantity} articles ajoutes au panier.` : "Produit ajoute au panier.");
+    return true;
+  };
+
+  const handleBuyNow = () => {
+    if (handleAddToCart()) {
+      navigate("/commande");
+    }
+  };
 
   const tabs = [
     { id: "description", label: "Description" },
@@ -199,6 +236,12 @@ export function ProductPage() {
           </div>
           <p className="text-xs text-muted-foreground">Prix TTC, livraison non incluse</p>
 
+          {availableStock !== null && (
+            <div className={`inline-flex rounded-full px-3 py-1 text-xs ${isOutOfStock ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"}`}>
+              {isOutOfStock ? "Produit hors stock" : `Stock disponible : ${availableStock}`}
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2">
             {specsList.map((spec) => (
               <span key={spec} className="px-3 py-1.5 rounded-lg bg-muted text-xs font-mono">{spec}</span>
@@ -213,24 +256,29 @@ export function ProductPage() {
                   <Minus className="w-4 h-4" />
                 </button>
                 <span className="w-10 text-center text-sm">{quantity}</span>
-                <button onClick={() => setQuantity(quantity + 1)} className="w-10 h-10 flex items-center justify-center hover:bg-muted">
+                <button
+                  onClick={() => setQuantity(quantity + 1)}
+                  disabled={isOutOfStock || maxQuantityReached}
+                  className="w-10 h-10 flex items-center justify-center hover:bg-muted disabled:opacity-40"
+                >
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
             </div>
             <div className="flex gap-3">
               <button
-                onClick={() => {
-                  for (let index = 0; index < quantity; index += 1) {
-                    addToCart(product);
-                  }
-                }}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-[#E8400C] dark:bg-[#FF5722] text-white hover:opacity-90 transition-opacity"
+                onClick={handleAddToCart}
+                disabled={isOutOfStock}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-[#E8400C] dark:bg-[#FF5722] text-white hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <ShoppingCart className="w-4.5 h-4.5" />
-                Ajouter au panier
+                {isOutOfStock ? "Hors stock" : "Ajouter au panier"}
               </button>
-              <button className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg border-2 border-primary text-foreground hover:bg-muted transition-colors">
+              <button
+                onClick={handleBuyNow}
+                disabled={isOutOfStock}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg border-2 border-primary text-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              >
                 <Zap className="w-4.5 h-4.5" />
                 Acheter maintenant
               </button>

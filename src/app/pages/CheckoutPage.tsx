@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Check, CreditCard, Loader2, Truck, Package, MapPin } from "lucide-react";
+import { AlertTriangle, Check, CreditCard, Loader2, Truck, Package, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import {
   ApiError,
@@ -13,7 +13,9 @@ import {
   type OrderPreview,
   type ShippingAddress,
 } from "../api/orders";
-import { formatPrice, useStore } from "../data/store";
+import { getCatalogProductsByIds } from "../api/products";
+import { formatPrice, type Product, useStore } from "../data/store";
+import { buildOrderItemsPayload, resolveCartItems } from "../lib/cart";
 import { useAuth } from "../context/AuthContext";
 
 const steps = [
@@ -60,6 +62,7 @@ export function CheckoutPage() {
   const {
     cart,
     clearCart,
+    syncCartProducts,
     checkoutPromoCode,
     setCheckoutPromoCode,
   } = useStore();
@@ -85,20 +88,34 @@ export function CheckoutPage() {
   const [promoLoading, setPromoLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
+  const [catalogError, setCatalogError] = useState("");
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogSyncReady, setCatalogSyncReady] = useState(false);
+  const [inventoryNotice, setInventoryNotice] = useState("");
+  const [liveProducts, setLiveProducts] = useState<Product[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [orderSuccess, setOrderSuccess] = useState<OrderCreateResponse | null>(null);
 
-  const cartItemsPayload = useMemo(
-    () =>
-      cart.map((item) => ({
-        product_id: Number(item.product.id),
-        quantity: item.quantity,
-      })),
+  const cartIdsKey = useMemo(
+    () => Array.from(new Set(cart.map((item) => item.product.id))).join(","),
     [cart],
   );
+  const resolvedCartItems = useMemo(
+    () => resolveCartItems(
+      cart,
+      catalogSyncReady ? liveProducts : cart.map((item) => item.product),
+    ),
+    [cart, liveProducts, catalogSyncReady],
+  );
+  const invalidItems = resolvedCartItems.filter((item) => !item.isValid);
+  const validItems = resolvedCartItems.filter((item) => item.isValid);
+  const cartItemsPayload = useMemo(
+    () => buildOrderItemsPayload(validItems.map((item) => ({ id: item.id, quantity: item.quantity }))),
+    [validItems],
+  );
 
-  const fallbackSubtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const fallbackSubtotal = resolvedCartItems.reduce((sum, item) => sum + item.lineTotal, 0);
   const selectedDeliveryMethod = checkoutOptions?.delivery_methods.find((method) => method.id === deliveryMethodId) || null;
   const fallbackDelivery = selectedDeliveryMethod?.name === "standard"
     ? fallbackSubtotal >= (checkoutOptions?.delivery_rules.free_threshold || 70000)
@@ -109,6 +126,15 @@ export function CheckoutPage() {
   const deliveryCost = preview?.delivery_cost ?? fallbackDelivery;
   const discountAmount = preview?.discount_amount ?? 0;
   const total = preview?.total_ttc ?? subtotal + deliveryCost - discountAmount;
+  const canContinueToPayment =
+    invalidItems.length === 0
+    && !previewError
+    && cartItemsPayload.length > 0;
+  const canSubmitOrder =
+    !submitLoading
+    && !previewError
+    && invalidItems.length === 0
+    && cartItemsPayload.length > 0;
 
   useEffect(() => {
     if (!user) return;
@@ -161,13 +187,82 @@ export function CheckoutPage() {
   }, []);
 
   useEffect(() => {
+    if (!cartIdsKey) {
+      setLiveProducts([]);
+      setCatalogLoading(false);
+      setCatalogSyncReady(false);
+      setCatalogError("");
+      setInventoryNotice("");
+      return;
+    }
+
+    let ignore = false;
+
+    setCatalogLoading(true);
+    setCatalogSyncReady(false);
+
+    getCatalogProductsByIds(cart.map((item) => item.product.id))
+      .then((products) => {
+        if (ignore) return;
+
+        const productMap = new Map(products.map((product) => [product.id, product]));
+        const quantityAdjusted = cart.some((item) => {
+          const liveProduct = productMap.get(item.product.id);
+          return typeof liveProduct?.stock === "number" && liveProduct.stock > 0 && item.quantity > liveProduct.stock;
+        });
+        const priceUpdated = cart.some((item) => {
+          const liveProduct = productMap.get(item.product.id);
+          return liveProduct && (
+            liveProduct.price !== item.product.price
+            || liveProduct.oldPrice !== item.product.oldPrice
+          );
+        });
+
+        const notices = [
+          quantityAdjusted ? "Certaines quantites du panier ont ete ajustees selon le stock disponible." : "",
+          priceUpdated ? "Les prix ont ete resynchronises avec le catalogue." : "",
+        ].filter(Boolean);
+
+        setInventoryNotice(notices.join(" "));
+        setLiveProducts(products);
+        syncCartProducts(products);
+        setCatalogSyncReady(true);
+        setCatalogError("");
+      })
+      .catch((error) => {
+        if (ignore) return;
+        setLiveProducts([]);
+        setInventoryNotice("");
+        setCatalogSyncReady(false);
+        setCatalogError(getErrorMessage(error, "Synchronisation temps reel indisponible. La commande sera reverifiee au moment de la validation."));
+      })
+      .finally(() => {
+        if (!ignore) {
+          setCatalogLoading(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [cartIdsKey]);
+
+  useEffect(() => {
     setPromoInput(checkoutPromoCode);
   }, [checkoutPromoCode]);
 
   useEffect(() => {
     if (cart.length === 0 || !deliveryMethodId) {
+      setPreviewLoading(false);
       setPreview(null);
       setPreviewError("");
+      return;
+    }
+
+    if (invalidItems.length > 0) {
+      setPreviewLoading(false);
+      setPreview(null);
+      setPreviewError("Votre panier doit etre corrige avant la confirmation de commande.");
       return;
     }
 
@@ -198,10 +293,11 @@ export function CheckoutPage() {
     return () => {
       ignore = true;
     };
-  }, [cartItemsPayload, checkoutPromoCode, deliveryMethodId, cart.length]);
+  }, [cartItemsPayload, checkoutPromoCode, deliveryMethodId, cart.length, invalidItems.length]);
 
   const applyPromo = async () => {
-    if (!deliveryMethodId || cart.length === 0) {
+    if (!deliveryMethodId || cart.length === 0 || invalidItems.length > 0) {
+      toast.error("Corrigez votre panier avant d'appliquer un code promo.");
       return;
     }
 
@@ -224,6 +320,37 @@ export function CheckoutPage() {
       setPreview(null);
       setPreviewError(getErrorMessage(error, "Impossible d'appliquer le code promo."));
       toast.error(getErrorMessage(error, "Impossible d'appliquer le code promo."));
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const removePromo = async () => {
+    setPromoInput("");
+
+    if (!deliveryMethodId || cart.length === 0 || invalidItems.length > 0) {
+      setCheckoutPromoCode("");
+      setPreview(null);
+      return;
+    }
+
+    setPromoLoading(true);
+
+    try {
+      const nextPreview = await previewOrder({
+        delivery_method_id: deliveryMethodId,
+        items: cartItemsPayload,
+      });
+
+      setCheckoutPromoCode("");
+      setPreview(nextPreview);
+      setPreviewError("");
+      toast.success("Code promo retire.");
+    } catch (error) {
+      setCheckoutPromoCode("");
+      setPreview(null);
+      setPreviewError(getErrorMessage(error, "Impossible de retirer le code promo."));
+      toast.error(getErrorMessage(error, "Impossible de retirer le code promo."));
     } finally {
       setPromoLoading(false);
     }
@@ -265,6 +392,11 @@ export function CheckoutPage() {
   };
 
   const continueToPayment = () => {
+    if (invalidItems.length > 0) {
+      toast.error("Votre panier contient des articles indisponibles ou non verifies.");
+      return;
+    }
+
     if (previewError) {
       toast.error(previewError);
       return;
@@ -278,7 +410,8 @@ export function CheckoutPage() {
   };
 
   const submitOrder = async () => {
-    if (!deliveryMethodId || cart.length === 0) {
+    if (!deliveryMethodId || cart.length === 0 || invalidItems.length > 0) {
+      toast.error("Votre panier doit etre corrige avant la commande.");
       return;
     }
 
@@ -390,6 +523,39 @@ export function CheckoutPage() {
           {step === 1 && (
             <div className="space-y-6">
               <h2 className="text-xl" style={{ fontWeight: 600 }}>Informations de livraison</h2>
+
+              {(inventoryNotice || catalogError || invalidItems.length > 0) && (
+                <div className="space-y-3">
+                  {inventoryNotice && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                      {inventoryNotice}
+                    </div>
+                  )}
+
+                  {catalogError && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                      {catalogError}
+                    </div>
+                  )}
+
+                  {invalidItems.length > 0 && (
+                    <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 mt-0.5 text-destructive" />
+                        <div>
+                          <p className="text-sm" style={{ fontWeight: 600 }}>Panier a corriger</p>
+                          <p className="text-sm text-muted-foreground">
+                            Retirez ou corrigez les articles indisponibles depuis le panier avant de continuer.
+                          </p>
+                          <Link to="/panier" className="inline-flex mt-3 text-sm text-[#E8400C] hover:underline">
+                            Retour au panier
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {addresses.length > 0 && (
                 <div className="space-y-3">
@@ -508,7 +674,11 @@ export function CheckoutPage() {
                 <p className="text-xs text-destructive">{fieldErrors.delivery_method_id}</p>
               )}
 
-              <button onClick={continueToPayment} className="w-full px-6 py-3.5 rounded-lg bg-[#E8400C] text-white hover:opacity-90 transition-opacity mt-4">
+              <button
+                onClick={continueToPayment}
+                disabled={!canContinueToPayment}
+                className="w-full px-6 py-3.5 rounded-lg bg-[#E8400C] text-white hover:opacity-90 transition-opacity mt-4 disabled:cursor-not-allowed disabled:opacity-60"
+              >
                 Continuer vers le paiement
               </button>
             </div>
@@ -570,7 +740,7 @@ export function CheckoutPage() {
                 </button>
                 <button
                   onClick={submitOrder}
-                  disabled={submitLoading || !!previewError}
+                  disabled={!canSubmitOrder}
                   className="flex-1 px-6 py-3.5 rounded-lg bg-[#E8400C] text-white hover:opacity-90 transition-opacity disabled:opacity-60"
                 >
                   {submitLoading ? "Validation..." : `Confirmer la commande — ${formatPrice(total)}`}
@@ -611,14 +781,17 @@ export function CheckoutPage() {
           <div className="lg:w-80">
             <div className="sticky top-24 p-5 rounded-xl bg-card border border-border space-y-4">
               <h3 className="text-sm" style={{ fontWeight: 600 }}>Votre commande</h3>
-              {cart.map((item) => (
-                <div key={item.product.id} className="flex gap-3">
-                  <img src={item.product.image} alt="" className="w-12 h-12 rounded-lg object-cover" />
+              {resolvedCartItems.map((item) => (
+                <div key={item.id} className="flex gap-3">
+                  <img src={item.effectiveProduct.image} alt="" className="w-12 h-12 rounded-lg object-cover" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs truncate">{item.product.name}</p>
+                    <p className="text-xs truncate">{item.effectiveProduct.name}</p>
                     <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                    {!item.isValid && (
+                      <p className="text-[11px] text-destructive">Article a corriger dans le panier</p>
+                    )}
                   </div>
-                  <span className="text-xs" style={{ fontWeight: 500 }}>{formatPrice(item.product.price * item.quantity)}</span>
+                  <span className="text-xs" style={{ fontWeight: 500 }}>{formatPrice(item.lineTotal)}</span>
                 </div>
               ))}
 
@@ -644,11 +817,22 @@ export function CheckoutPage() {
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-[#22C55E]"><span>Réduction</span><span>-{formatPrice(discountAmount)}</span></div>
                 )}
-                <div className="flex justify-between pt-2 border-t border-border" style={{ fontWeight: 600 }}><span>Total</span><span>{previewLoading ? "Calcul..." : formatPrice(total)}</span></div>
+                <div className="flex justify-between pt-2 border-t border-border" style={{ fontWeight: 600 }}><span>Total</span><span>{formatPrice(total)}</span></div>
               </div>
 
               {checkoutPromoCode && !previewError && (
-                <p className="text-xs text-[#22C55E]">Code appliqué: {checkoutPromoCode}</p>
+                <button
+                  onClick={removePromo}
+                  className="text-xs text-[#22C55E] hover:underline"
+                >
+                  Code applique : {checkoutPromoCode}. Retirer
+                </button>
+              )}
+              {catalogLoading && (
+                <p className="text-xs text-muted-foreground">Verification du panier en cours...</p>
+              )}
+              {previewLoading && (
+                <p className="text-xs text-muted-foreground">Mise a jour du total en cours...</p>
               )}
               {previewError && (
                 <p className="text-xs text-destructive">{previewError}</p>

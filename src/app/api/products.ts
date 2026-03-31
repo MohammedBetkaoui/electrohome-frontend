@@ -86,6 +86,7 @@ function mapCatalogProduct(product: CatalogProductResponse): Product {
     brand: product.brand || "ElectroHome",
     price: Number(product.price) || 0,
     oldPrice: product.oldPrice ?? undefined,
+    stock: Number(product.stock) || 0,
     image,
     images,
     rating: 0,
@@ -108,6 +109,27 @@ export async function getCatalogProducts(limit?: number): Promise<Product[]> {
   const query = searchParams.toString();
   const endpoint = query ? `/products?${query}` : "/products";
   const products = await fetchCatalog<CatalogProductResponse[]>(endpoint);
+  return products.map(mapCatalogProduct);
+}
+
+export async function getCatalogProductsByIds(ids: string[]): Promise<Product[]> {
+  const normalizedIds = Array.from(
+    new Set(
+      ids
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0),
+    ),
+  );
+
+  if (normalizedIds.length === 0) {
+    return [];
+  }
+
+  const searchParams = new URLSearchParams({
+    ids: normalizedIds.join(","),
+  });
+
+  const products = await fetchCatalog<CatalogProductResponse[]>(`/products?${searchParams.toString()}`);
   return products.map(mapCatalogProduct);
 }
 

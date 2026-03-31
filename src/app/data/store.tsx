@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 
 const THEME_STORAGE_KEY = "electrohome-theme";
+const CART_STORAGE_KEY = "electrohome-cart";
+const FAVORITES_STORAGE_KEY = "electrohome-favorites";
+const CHECKOUT_PROMO_STORAGE_KEY = "electrohome-checkout-promo";
 
 function getInitialDarkMode(): boolean {
   if (typeof window === "undefined") return true;
@@ -37,6 +40,7 @@ export interface Product {
   brand: string;
   price: number;
   oldPrice?: number;
+  stock?: number;
   image: string;
   images?: string[];
   rating: number;
@@ -77,11 +81,18 @@ export interface CartItem {
   quantity: number;
 }
 
+export type CartOperationResult = {
+  ok: boolean;
+  quantity: number;
+  reason?: "out_of_stock" | "max_stock_reached" | "removed";
+};
+
 interface StoreContextType {
   cart: CartItem[];
-  addToCart: (product: Product) => void;
+  addToCart: (product: Product, quantity?: number) => CartOperationResult;
   removeFromCart: (productId: string) => void;
-  updateQuantity: (productId: string, qty: number) => void;
+  updateQuantity: (productId: string, qty: number) => CartOperationResult;
+  syncCartProducts: (products: Product[]) => void;
   clearCart: () => void;
   checkoutPromoCode: string;
   setCheckoutPromoCode: (promoCode: string) => void;
@@ -95,32 +106,219 @@ interface StoreContextType {
 
 const StoreContext = createContext<StoreContextType>(null!);
 
+function readStorage<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+
+  try {
+    const rawValue = window.localStorage.getItem(key);
+    return rawValue ? JSON.parse(rawValue) as T : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function sanitizeQuantity(quantity: number): number {
+  if (!Number.isFinite(quantity)) {
+    return 1;
+  }
+
+  return Math.max(1, Math.floor(quantity));
+}
+
+function getProductMaxQuantity(product: Product): number | null {
+  if (typeof product.stock !== "number" || Number.isNaN(product.stock)) {
+    return null;
+  }
+
+  return Math.max(0, Math.floor(product.stock));
+}
+
+function normalizeCart(items: CartItem[]): CartItem[] {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .filter((item): item is CartItem => Boolean(item?.product?.id))
+    .map((item) => ({
+      product: item.product,
+      quantity: sanitizeQuantity(item.quantity),
+    }));
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [checkoutPromoCode, setCheckoutPromoCode] = useState("");
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => normalizeCart(readStorage<CartItem[]>(CART_STORAGE_KEY, [])));
+  const [checkoutPromoCode, setCheckoutPromoCode] = useState<string>(() => readStorage<string>(CHECKOUT_PROMO_STORAGE_KEY, ""));
+  const [favorites, setFavorites] = useState<string[]>(() => readStorage<string[]>(FAVORITES_STORAGE_KEY, []));
   const [darkMode, setDarkMode] = useState(getInitialDarkMode);
   const [searchQuery, setSearchQuery] = useState("");
+  const cartRef = useRef(cart);
+
+  useEffect(() => {
+    cartRef.current = cart;
+  }, [cart]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
     window.localStorage.setItem(THEME_STORAGE_KEY, darkMode ? "dark" : "light");
   }, [darkMode]);
 
-  const addToCart = (product: Product) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id);
-      if (existing) return prev.map((i) => i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { product, quantity: 1 }];
-    });
+  useEffect(() => {
+    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+  }, [cart]);
+
+  useEffect(() => {
+    window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
+  }, [favorites]);
+
+  useEffect(() => {
+    window.localStorage.setItem(CHECKOUT_PROMO_STORAGE_KEY, JSON.stringify(checkoutPromoCode));
+  }, [checkoutPromoCode]);
+
+  const commitCart = (nextCart: CartItem[]) => {
+    cartRef.current = nextCart;
+    setCart(nextCart);
   };
 
-  const removeFromCart = (productId: string) => setCart((prev) => prev.filter((i) => i.product.id !== productId));
-  const updateQuantity = (productId: string, qty: number) => {
-    if (qty < 1) return removeFromCart(productId);
-    setCart((prev) => prev.map((i) => i.product.id === productId ? { ...i, quantity: qty } : i));
+  const addToCart = (product: Product, quantity = 1): CartOperationResult => {
+    const requestedQuantity = sanitizeQuantity(quantity);
+    const currentCart = cartRef.current;
+    const currentItem = currentCart.find((item) => item.product.id === product.id);
+    const currentQuantity = currentItem?.quantity ?? 0;
+    const maxQuantity = getProductMaxQuantity(product);
+
+    if (maxQuantity !== null && maxQuantity <= 0) {
+      return { ok: false, quantity: currentQuantity, reason: "out_of_stock" };
+    }
+
+    const nextQuantity = maxQuantity !== null
+      ? Math.min(currentQuantity + requestedQuantity, maxQuantity)
+      : currentQuantity + requestedQuantity;
+    const isClampedByStock = maxQuantity !== null && currentQuantity + requestedQuantity > maxQuantity;
+
+    if (nextQuantity === currentQuantity) {
+      return { ok: false, quantity: currentQuantity, reason: "max_stock_reached" };
+    }
+
+    const nextCart = currentItem
+      ? currentCart.map((item) => (
+          item.product.id === product.id
+            ? { ...item, product: { ...item.product, ...product }, quantity: nextQuantity }
+            : item
+        ))
+      : [...currentCart, { product, quantity: nextQuantity }];
+
+    commitCart(nextCart);
+
+    return {
+      ok: true,
+      quantity: nextQuantity,
+      reason: isClampedByStock ? "max_stock_reached" : undefined,
+    };
   };
-  const clearCart = () => setCart([]);
+
+  const removeFromCart = (productId: string) => {
+    const currentCart = cartRef.current;
+    const nextCart = currentCart.filter((item) => item.product.id !== productId);
+
+    if (nextCart.length !== currentCart.length) {
+      commitCart(nextCart);
+    }
+  };
+
+  const updateQuantity = (productId: string, qty: number): CartOperationResult => {
+    const currentCart = cartRef.current;
+    const currentItem = currentCart.find((item) => item.product.id === productId);
+
+    if (!currentItem) {
+      return { ok: false, quantity: 0 };
+    }
+
+    if (qty < 1) {
+      removeFromCart(productId);
+      return { ok: true, quantity: 0, reason: "removed" };
+    }
+
+    const normalizedQuantity = sanitizeQuantity(qty);
+    const maxQuantity = getProductMaxQuantity(currentItem.product);
+
+    if (maxQuantity !== null && maxQuantity <= 0) {
+      return { ok: false, quantity: currentItem.quantity, reason: "out_of_stock" };
+    }
+
+    const nextQuantity = maxQuantity !== null
+      ? Math.min(normalizedQuantity, maxQuantity)
+      : normalizedQuantity;
+
+    if (nextQuantity === currentItem.quantity) {
+      return {
+        ok: false,
+        quantity: currentItem.quantity,
+        reason: nextQuantity === normalizedQuantity ? undefined : "max_stock_reached",
+      };
+    }
+
+    commitCart(currentCart.map((item) => (
+      item.product.id === productId
+        ? { ...item, quantity: nextQuantity }
+        : item
+    )));
+
+    return {
+      ok: true,
+      quantity: nextQuantity,
+      reason: nextQuantity === normalizedQuantity ? undefined : "max_stock_reached",
+    };
+  };
+
+  const syncCartProducts = (products: Product[]) => {
+    if (products.length === 0) {
+      return;
+    }
+
+    const currentCart = cartRef.current;
+    const productMap = new Map(products.map((product) => [product.id, product]));
+    let hasChanges = false;
+
+    const nextCart = currentCart.map((item) => {
+      const nextProduct = productMap.get(item.product.id);
+
+      if (!nextProduct) {
+        return item;
+      }
+
+      const maxQuantity = getProductMaxQuantity(nextProduct);
+      const nextQuantity =
+        maxQuantity !== null && maxQuantity > 0
+          ? Math.min(item.quantity, maxQuantity)
+          : item.quantity;
+
+      if (
+        nextQuantity !== item.quantity
+        || nextProduct.price !== item.product.price
+        || nextProduct.oldPrice !== item.product.oldPrice
+        || nextProduct.stock !== item.product.stock
+        || nextProduct.image !== item.product.image
+        || nextProduct.name !== item.product.name
+      ) {
+        hasChanges = true;
+      }
+
+      return {
+        product: { ...item.product, ...nextProduct },
+        quantity: nextQuantity,
+      };
+    });
+
+    if (hasChanges) {
+      commitCart(nextCart);
+    }
+  };
+
+  const clearCart = () => {
+    commitCart([]);
+    setCheckoutPromoCode("");
+  };
 
   const toggleFavorite = (id: string) => setFavorites((prev) => prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]);
   const toggleDarkMode = () => setDarkMode((v) => !v);
@@ -132,6 +330,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         addToCart,
         removeFromCart,
         updateQuantity,
+        syncCartProducts,
         clearCart,
         checkoutPromoCode,
         setCheckoutPromoCode,

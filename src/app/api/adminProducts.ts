@@ -32,6 +32,7 @@ export interface AdminProduct {
   stock: number;
   status: "active" | "draft" | "outofstock";
   image?: string | null;
+  images?: string[];
   energy?: string | null;
   specs?: string | null;
   description?: string | null;

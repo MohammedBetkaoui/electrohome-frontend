@@ -1,5 +1,6 @@
 import { Heart, ShoppingCart, Star } from "lucide-react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 import { Product, useStore, formatPrice } from "../data/store";
 
 const badgeColors: Record<string, string> = {
@@ -13,6 +14,24 @@ export function ProductCard({ product }: { product: Product }) {
   const isFav = favorites.includes(product.id);
   const discount = product.oldPrice ? Math.round((1 - product.price / product.oldPrice) * 100) : 0;
   const productPath = `/produit/${product.slug ?? product.id}`;
+  const stock = typeof product.stock === "number" ? Math.max(0, Math.floor(product.stock)) : null;
+  const isOutOfStock = stock !== null && stock <= 0;
+
+  const handleAddToCart = () => {
+    const result = addToCart(product);
+
+    if (result.reason === "out_of_stock") {
+      toast.error("Ce produit est actuellement hors stock.");
+      return;
+    }
+
+    if (result.reason === "max_stock_reached") {
+      toast.info(`Stock maximum atteint${result.quantity > 0 ? ` : ${result.quantity}` : ""}.`);
+      return;
+    }
+
+    toast.success("Produit ajoute au panier.");
+  };
 
   return (
     <div className="group bg-card rounded-xl border border-border overflow-hidden transition-all duration-200 hover:shadow-lg hover:scale-[1.02]">
@@ -38,6 +57,11 @@ export function ProductCard({ product }: { product: Product }) {
           <h3 className="text-sm line-clamp-2 hover:text-[#E8400C] transition-colors">{product.name}</h3>
         </Link>
         <p className="text-xs text-muted-foreground font-mono">{product.specs}</p>
+        {stock !== null && (
+          <p className={`text-xs ${isOutOfStock ? "text-destructive" : "text-muted-foreground"}`}>
+            {isOutOfStock ? "Hors stock" : `Stock disponible : ${stock}`}
+          </p>
+        )}
         <div className="flex items-center gap-1">
           {Array.from({ length: 5 }).map((_, i) => (
             <Star key={i} className={`w-3.5 h-3.5 ${i < Math.round(product.rating) ? "fill-[#FFD60A] text-[#FFD60A]" : "text-border"}`} />
@@ -50,8 +74,9 @@ export function ProductCard({ product }: { product: Product }) {
             {product.oldPrice && <span className="text-sm text-muted-foreground line-through">{formatPrice(product.oldPrice)}</span>}
           </div>
           <button
-            onClick={() => addToCart(product)}
-            className="w-9 h-9 rounded-lg bg-[#E8400C] dark:bg-[#FF5722] text-white flex items-center justify-center hover:opacity-90 transition-opacity"
+            onClick={handleAddToCart}
+            disabled={isOutOfStock}
+            className="w-9 h-9 rounded-lg bg-[#E8400C] dark:bg-[#FF5722] text-white flex items-center justify-center hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ShoppingCart className="w-4 h-4" />
           </button>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Truck, Shield, Headphones, Award, ChevronRight, ArrowRight, Timer } from "lucide-react";
+import { toast } from "sonner";
 import { BRANDS, CATEGORIES, IMAGES, formatPrice, useStore } from "../data/store";
 import { getCatalogProducts } from "../api/products";
 import { ProductCard } from "../components/ProductCard";
@@ -107,6 +108,22 @@ export function HomePage() {
   }, []);
 
   const flashProducts = featuredProducts.filter((product) => product.oldPrice).slice(0, 3);
+
+  const handleFlashAddToCart = (product: Product) => {
+    const result = addToCart(product);
+
+    if (result.reason === "out_of_stock") {
+      toast.error("Ce produit est actuellement hors stock.");
+      return;
+    }
+
+    if (result.reason === "max_stock_reached") {
+      toast.info(`Stock maximum atteint${result.quantity > 0 ? ` : ${result.quantity}` : ""}.`);
+      return;
+    }
+
+    toast.success("Produit ajoute au panier.");
+  };
 
   return (
     <div>
@@ -255,10 +272,11 @@ export function HomePage() {
                       <span className="text-sm opacity-50 line-through">{formatPrice(product.oldPrice!)}</span>
                     </div>
                     <button
-                      onClick={() => addToCart(product)}
-                      className="mt-2 px-3 py-1.5 rounded-lg bg-[#E8400C] text-white text-xs hover:opacity-90"
+                      onClick={() => handleFlashAddToCart(product)}
+                      disabled={typeof product.stock === "number" && product.stock <= 0}
+                      className="mt-2 px-3 py-1.5 rounded-lg bg-[#E8400C] text-white text-xs hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Ajouter au panier
+                      {typeof product.stock === "number" && product.stock <= 0 ? "Hors stock" : "Ajouter au panier"}
                     </button>
                   </div>
                 </div>
