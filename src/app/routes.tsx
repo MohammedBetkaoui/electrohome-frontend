@@ -53,7 +53,14 @@ export const router = createBrowserRouter([
       { path: "categorie/:slug", Component: CategoryPage },
       { path: "produit/:slug", Component: ProductPage },
       { path: "panier", Component: CartPage },
-      { path: "commande", Component: CheckoutPage },
+      {
+        path: "commande",
+        element: (
+          <AuthGuard>
+            <CheckoutPage />
+          </AuthGuard>
+        ),
+      },
       { path: "recherche", Component: SearchPage },
       { path: "marques", Component: BrandsPage },
       { path: "promotions", Component: PromotionsPage },
@@ -121,4 +128,3 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
-

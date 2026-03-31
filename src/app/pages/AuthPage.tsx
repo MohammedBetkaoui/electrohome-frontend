@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, Truck, ShieldCheck, RefreshCw } from "lucide-react";
@@ -29,6 +29,8 @@ export function AuthPage() {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
 
   // ── Formulaire Login ──────────────────────────────────
   const {
@@ -56,7 +58,7 @@ export function AuthPage() {
       if (res.status === "success" && res.data) {
         login(res.data.user, res.data.token);
         toast.success(`Bienvenue, ${res.data.user.first_name} ! 👋`);
-        navigate(res.data.user.is_admin ? "/admin" : "/compte");
+        navigate(res.data.user.is_admin ? "/admin" : redirectTo || "/compte");
       } else {
         // Erreurs de validation ou credentials incorrects
         if (res.errors?.email) {
@@ -81,7 +83,7 @@ export function AuthPage() {
       if (res.status === "success" && res.data) {
         login(res.data.user, res.data.token);
         toast.success("Compte créé avec succès ! Bienvenue 🎉");
-        navigate("/compte");
+        navigate(redirectTo || "/compte");
       } else {
         // Afficher les erreurs de validation champ par champ
         if (res.errors) {

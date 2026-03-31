@@ -82,6 +82,9 @@ interface StoreContextType {
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, qty: number) => void;
+  clearCart: () => void;
+  checkoutPromoCode: string;
+  setCheckoutPromoCode: (promoCode: string) => void;
   favorites: string[];
   toggleFavorite: (productId: string) => void;
   darkMode: boolean;
@@ -94,6 +97,7 @@ const StoreContext = createContext<StoreContextType>(null!);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [checkoutPromoCode, setCheckoutPromoCode] = useState("");
   const [favorites, setFavorites] = useState<string[]>([]);
   const [darkMode, setDarkMode] = useState(getInitialDarkMode);
   const [searchQuery, setSearchQuery] = useState("");
@@ -116,12 +120,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (qty < 1) return removeFromCart(productId);
     setCart((prev) => prev.map((i) => i.product.id === productId ? { ...i, quantity: qty } : i));
   };
+  const clearCart = () => setCart([]);
 
   const toggleFavorite = (id: string) => setFavorites((prev) => prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]);
   const toggleDarkMode = () => setDarkMode((v) => !v);
 
   return (
-    <StoreContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, favorites, toggleFavorite, darkMode, toggleDarkMode, searchQuery, setSearchQuery }}>
+    <StoreContext.Provider
+      value={{
+        cart,
+        addToCart,
+        removeFromCart,
+        updateQuantity,
+        clearCart,
+        checkoutPromoCode,
+        setCheckoutPromoCode,
+        favorites,
+        toggleFavorite,
+        darkMode,
+        toggleDarkMode,
+        searchQuery,
+        setSearchQuery,
+      }}
+    >
       {children}
     </StoreContext.Provider>
   );
