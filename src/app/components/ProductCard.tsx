@@ -12,11 +12,12 @@ export function ProductCard({ product }: { product: Product }) {
   const { addToCart, favorites, toggleFavorite } = useStore();
   const isFav = favorites.includes(product.id);
   const discount = product.oldPrice ? Math.round((1 - product.price / product.oldPrice) * 100) : 0;
+  const productPath = `/produit/${product.slug ?? product.id}`;
 
   return (
     <div className="group bg-card rounded-xl border border-border overflow-hidden transition-all duration-200 hover:shadow-lg hover:scale-[1.02]">
       <div className="relative aspect-square overflow-hidden bg-muted">
-        <Link to={`/produit/${product.id}`}>
+        <Link to={productPath}>
           <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
         </Link>
         {product.badge && (
@@ -33,7 +34,7 @@ export function ProductCard({ product }: { product: Product }) {
       </div>
       <div className="p-4 space-y-2">
         <p className="text-xs text-muted-foreground uppercase tracking-wide">{product.brand}</p>
-        <Link to={`/produit/${product.id}`}>
+        <Link to={productPath}>
           <h3 className="text-sm line-clamp-2 hover:text-[#E8400C] transition-colors">{product.name}</h3>
         </Link>
         <p className="text-xs text-muted-foreground font-mono">{product.specs}</p>

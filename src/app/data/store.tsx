@@ -32,17 +32,20 @@ export const IMAGES = {
 
 export interface Product {
   id: string;
+  slug?: string;
   name: string;
   brand: string;
   price: number;
   oldPrice?: number;
   image: string;
+  images?: string[];
   rating: number;
   reviewCount: number;
   badge?: "Nouveau" | "Promo" | "Bestseller";
   category: string;
   specs: string;
   energy: string;
+  description?: string;
 }
 
 export const CATEGORIES = [
