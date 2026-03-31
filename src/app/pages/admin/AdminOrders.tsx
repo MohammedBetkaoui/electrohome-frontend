@@ -28,7 +28,7 @@ const STATUS_CONFIG: Record<
 > = {
   pending:   { label: "En attente",    color: "#F59E0B", icon: Clock },
   confirmed: { label: "Confirmée",     color: "#3B82F6", icon: CheckCircle2 },
-  preparing: { label: "En préparation",color: "#8B5CF6", icon: Package },
+  processing: { label: "En préparation",color: "#8B5CF6", icon: Package },
   shipped:   { label: "Expédiée",      color: "#06B6D4", icon: Truck },
   delivered: { label: "Livrée",        color: "#10B981", icon: CheckCircle2 },
   cancelled: { label: "Annulée",       color: "#EF4444", icon: XCircle },
@@ -54,6 +54,8 @@ function formatDateTime(date: string) {
     minute: "2-digit",
   });
 }
+
+const ADMIN_ORDERS_REFRESH_MS = 5000;
 
 // ─── Order Detail Modal ────────────────────────────────────────────────────
 function OrderDetailModal({
@@ -466,9 +468,18 @@ export function AdminOrders() {
   };
 
   // Charger commandes
-  const loadOrders = async (silent = false) => {
-    if (!silent) setIsLoading(true);
-    else setIsRefreshing(true);
+  const loadOrders = async ({
+    silent = false,
+    showRefreshState = false,
+  }: {
+    silent?: boolean;
+    showRefreshState?: boolean;
+  } = {}) => {
+    if (!silent) {
+      setIsLoading(true);
+    } else if (showRefreshState) {
+      setIsRefreshing(true);
+    }
 
     try {
       const params: GetOrdersParams = {
@@ -485,23 +496,36 @@ export function AdminOrders() {
       setTotalPages(res.meta.last_page);
       setTotalCount(res.meta.total);
     } catch {
-      toast.error("Impossible de charger les commandes.");
+      if (!silent || showRefreshState) {
+        toast.error("Impossible de charger les commandes.");
+      }
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
+      if (showRefreshState) {
+        setIsRefreshing(false);
+      }
     }
   };
 
   // Ouvrir le détail
-  const openDetail = async (id: number) => {
-    setLoadingDetail(true);
+  const openDetail = async (id: number, { silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) {
+      setLoadingDetail(true);
+    }
+
     try {
       const detail = await getOrder(id);
       setDetailOrder(detail);
     } catch {
-      toast.error("Impossible de charger les détails.");
+      if (!silent) {
+        toast.error("Impossible de charger les détails.");
+      }
     } finally {
-      setLoadingDetail(false);
+      if (!silent) {
+        setLoadingDetail(false);
+      }
     }
   };
 
@@ -513,10 +537,13 @@ export function AdminOrders() {
   ) => {
     const updated = await updateOrderStatus(id, status, note);
     setDetailOrder(updated);
-    // Mettre à jour la liste
     setOrders((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, status: updated.status } : o))
+      prev.map((order) => (order.id === id ? { ...order, status: updated.status } : order))
     );
+    await Promise.all([
+      loadOrders({ silent: true }),
+      loadStats(),
+    ]);
   };
 
   useEffect(() => {
@@ -526,6 +553,54 @@ export function AdminOrders() {
   useEffect(() => {
     loadOrders();
   }, [debouncedSearch, statusFilter, sortField, sortDir, page]);
+
+  useEffect(() => {
+    let polling = false;
+
+    const refreshOrders = async () => {
+      if (document.visibilityState !== "visible" || polling) {
+        return;
+      }
+
+      polling = true;
+
+      try {
+        await Promise.all([
+          loadOrders({ silent: true }),
+          loadStats(),
+        ]);
+
+        if (detailOrder?.id) {
+          await openDetail(detailOrder.id, { silent: true });
+        }
+      } finally {
+        polling = false;
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshOrders();
+    }, ADMIN_ORDERS_REFRESH_MS);
+
+    const handleFocus = () => {
+      void refreshOrders();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshOrders();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [debouncedSearch, statusFilter, sortField, sortDir, page, detailOrder?.id]);
 
   const toggleSort = (field: typeof sortField) => {
     if (sortField === field) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -551,7 +626,7 @@ export function AdminOrders() {
             { label: "En attente",   value: stats.pending,   icon: Clock,        color: "#F59E0B" },
             {
               label: "En cours",
-              value: stats.confirmed + stats.preparing + stats.shipped,
+              value: stats.confirmed + stats.processing + stats.shipped,
               icon: Truck, color: "#8B5CF6",
             },
             { label: "Livrées",      value: stats.delivered, icon: CheckCircle2, color: "#10B981" },
@@ -587,7 +662,7 @@ export function AdminOrders() {
 
       {/* Status Quick Filters */}
       <div className="flex flex-wrap gap-2">
-        {(["all", "pending", "confirmed", "preparing", "shipped", "delivered", "cancelled", "returned"] as const).map(
+        {(["all", "pending", "confirmed", "processing", "shipped", "delivered", "cancelled", "returned"] as const).map(
           (key) => {
             const cfg = key === "all" ? null : STATUS_CONFIG[key];
             const count =
@@ -626,7 +701,13 @@ export function AdminOrders() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => loadOrders(true)}
+              onClick={() => {
+                void Promise.all([
+                  loadOrders({ silent: true, showRefreshState: true }),
+                  loadStats(),
+                  detailOrder?.id ? openDetail(detailOrder.id, { silent: true }) : Promise.resolve(),
+                ]);
+              }}
               disabled={isRefreshing}
               className="w-9 h-9 rounded-lg border border-[#E5E7EB] dark:border-white/10 flex items-center justify-center text-[#6B7280] hover:text-[#FF6B35] disabled:opacity-50"
             >
@@ -643,6 +724,9 @@ export function AdminOrders() {
         </div>
         <p className="text-[12px] text-[#9CA3AF] mt-3">
           {totalCount} commande{totalCount > 1 ? "s" : ""}
+        </p>
+        <p className="text-[12px] text-[#9CA3AF] mt-1">
+          Liste synchronisée automatiquement toutes les 5 secondes.
         </p>
       </div>
 

@@ -7,7 +7,7 @@ const API_URL = "http://localhost:8000/api/admin";
 export type OrderStatus =
   | "pending"
   | "confirmed"
-  | "preparing"
+  | "processing"
   | "shipped"
   | "delivered"
   | "cancelled"
@@ -76,7 +76,8 @@ export interface AdminOrderStats {
   total: number;
   pending: number;
   confirmed: number;
-  preparing: number;
+  processing: number;
+  preparing?: number;
   shipped: number;
   delivered: number;
   cancelled: number;

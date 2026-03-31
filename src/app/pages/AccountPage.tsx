@@ -7,6 +7,8 @@ import { PRODUCTS, formatPrice, useStore } from "../data/store";
 import { ProductCard } from "../components/ProductCard";
 import { useAuth } from "../context/AuthContext";
 
+const CUSTOMER_ORDERS_REFRESH_MS = 5000;
+
 const sideNav = [
   { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { id: "orders", label: "Mes commandes", icon: Package },
@@ -19,6 +21,7 @@ const sideNav = [
 const orderStatusMap: Record<string, { label: string; className: string }> = {
   pending: { label: "En attente", className: "text-amber-500" },
   confirmed: { label: "Confirmée", className: "text-sky-500" },
+  processing: { label: "En préparation", className: "text-violet-500" },
   preparing: { label: "En préparation", className: "text-violet-500" },
   shipped: { label: "Expédiée", className: "text-blue-500" },
   delivered: { label: "Livrée", className: "text-emerald-500" },
@@ -57,20 +60,36 @@ export function AccountPage() {
   const initials = user ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase() : "";
   const latestOrderStatus = latestOrder ? formatOrderStatus(latestOrder.status) : null;
 
-  const loadOrders = async () => {
-    setOrdersLoading(true);
+  const loadOrders = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) {
+      setOrdersLoading(true);
+    }
 
     try {
       const response = await getMyOrders();
       setOrders(response.data);
 
-      if (response.data.length > 0 && !selectedOrderId) {
+      if (response.data.length === 0) {
+        setSelectedOrderId(null);
+        setSelectedOrder(null);
+        return;
+      }
+
+      const hasSelectedOrder = selectedOrderId
+        ? response.data.some((order) => order.id === selectedOrderId)
+        : false;
+
+      if (!hasSelectedOrder) {
         setSelectedOrderId(response.data[0].id);
       }
     } catch {
-      toast.error("Impossible de charger vos commandes.");
+      if (!silent) {
+        toast.error("Impossible de charger vos commandes.");
+      }
     } finally {
-      setOrdersLoading(false);
+      if (!silent) {
+        setOrdersLoading(false);
+      }
     }
   };
 
@@ -87,17 +106,23 @@ export function AccountPage() {
     }
   };
 
-  const loadOrderDetail = async (orderId: number) => {
-    setDetailLoading(true);
+  const loadOrderDetail = async (orderId: number, { silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) {
+      setDetailLoading(true);
+    }
 
     try {
       const detail = await getMyOrder(orderId);
       setSelectedOrder(detail);
       setSelectedOrderId(orderId);
     } catch {
-      toast.error("Impossible de charger le détail de cette commande.");
+      if (!silent) {
+        toast.error("Impossible de charger le détail de cette commande.");
+      }
     } finally {
-      setDetailLoading(false);
+      if (!silent) {
+        setDetailLoading(false);
+      }
     }
   };
 
@@ -111,6 +136,55 @@ export function AccountPage() {
       void loadOrderDetail(selectedOrderId);
     }
   }, [selectedOrderId]);
+
+  useEffect(() => {
+    if (active !== "orders" && active !== "dashboard") {
+      return;
+    }
+
+    let polling = false;
+
+    const refreshOrders = async () => {
+      if (document.visibilityState !== "visible" || polling) {
+        return;
+      }
+
+      polling = true;
+
+      try {
+        await loadOrders({ silent: true });
+
+        if (active === "orders" && selectedOrderId) {
+          await loadOrderDetail(selectedOrderId, { silent: true });
+        }
+      } finally {
+        polling = false;
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshOrders();
+    }, CUSTOMER_ORDERS_REFRESH_MS);
+
+    const handleFocus = () => {
+      void refreshOrders();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshOrders();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [active, selectedOrderId]);
 
   const handleLogout = async () => {
     await logout();
@@ -226,7 +300,12 @@ export function AccountPage() {
 
           {active === "orders" && (
             <div className="space-y-6">
-              <h2 className="text-xl" style={{ fontWeight: 600 }}>Mes commandes</h2>
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <h2 className="text-xl" style={{ fontWeight: 600 }}>Mes commandes</h2>
+                <p className="text-xs text-muted-foreground">
+                  Mise à jour automatique toutes les 5 secondes.
+                </p>
+              </div>
 
               {ordersLoading ? (
                 <p className="text-sm text-muted-foreground">Chargement des commandes...</p>
