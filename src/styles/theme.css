@@ -192,3 +192,21 @@
     line-height: 1.5;
   }
 }
+
+.dark select {
+  color-scheme: dark;
+  background-color: var(--card);
+  color: var(--foreground);
+}
+
+.dark select option {
+  background-color: var(--card);
+  color: var(--foreground);
+}
+
+.dark select option:checked,
+.dark select option:focus,
+.dark select option:hover {
+  background-color: var(--muted);
+  color: var(--foreground);
+}

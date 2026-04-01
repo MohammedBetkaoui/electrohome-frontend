@@ -19,6 +19,7 @@ import { ApiError, getCheckoutOptions, previewOrder, type CheckoutOptions, type 
 import { getCatalogProductsByIds } from "../api/products";
 import { PRODUCTS, formatPrice, type Product, useStore } from "../data/store";
 import { buildOrderItemsPayload, resolveCartItems } from "../lib/cart";
+import { useAuth } from "../context/AuthContext";
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError) {
@@ -34,6 +35,8 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export function CartPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role?.name === "admin" || user?.is_admin;
   const {
     cart,
     removeFromCart,
@@ -287,6 +290,21 @@ export function CartPage() {
   const refreshCartCatalog = () => {
     setRefreshSeed((current) => current + 1);
   };
+
+  if (isAdmin) {
+    return (
+      <div className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-20 py-24 text-center">
+        <div className="w-24 h-24 mx-auto rounded-full bg-muted flex items-center justify-center mb-6">
+          <Shield className="w-10 h-10 text-muted-foreground" />
+        </div>
+        <h1 className="text-2xl mb-2" style={{ fontWeight: 600 }}>Action non autorisée</h1>
+        <p className="text-muted-foreground mb-6">Les administrateurs ne peuvent pas passer de commande sur le site public.</p>
+        <Link to="/admin" className="inline-flex px-6 py-3 rounded-lg bg-[#E8400C] text-white text-sm hover:opacity-90">
+          Retour au tableau de bord
+        </Link>
+      </div>
+    );
+  }
 
   if (cart.length === 0) {
     return (

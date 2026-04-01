@@ -20,6 +20,7 @@ import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { AdminProducts } from "./pages/admin/AdminProducts";
 import { AdminProductForm } from "./pages/admin/AdminProductForm";
 import { AdminOrders } from "./pages/admin/AdminOrders";
+import { AdminOrderDetail } from "./pages/admin/AdminOrderDetail";
 import { AdminClients } from "./pages/admin/AdminClients";
 import { AdminReturns } from "./pages/admin/AdminReturns";
 import { AdminMarketing } from "./pages/admin/AdminMarketing";
@@ -111,6 +112,7 @@ export const router = createBrowserRouter([
       { path: "produits/modifier/:id", Component: AdminProductForm },
       { path: "categories", Component: AdminCategories },
       { path: "commandes", Component: AdminOrders },
+      { path: "commandes/:id", Component: AdminOrderDetail },
       { path: "retours", Component: AdminReturns },
       { path: "clients", Component: AdminClients },
       { path: "factures", Component: AdminInvoices },

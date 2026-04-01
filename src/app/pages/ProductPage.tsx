@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ProductCard } from "../components/ProductCard";
 import { getCatalogProduct, getCatalogProducts } from "../api/products";
 import { PRODUCTS, formatPrice, useStore } from "../data/store";
+import { useAuth } from "../context/AuthContext";
 import { Skeleton } from "../components/ui/skeleton";
 import type { Product } from "../data/store";
 
@@ -37,6 +38,8 @@ function ProductPageSkeleton() {
 export function ProductPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role?.name === "admin" || user?.is_admin;
   const staticProduct = PRODUCTS.find((product) => product.slug === slug || product.id === slug) || null;
   const { addToCart, favorites, toggleFavorite } = useStore();
   const [remoteProduct, setRemoteProduct] = useState<Product | null>(null);
@@ -111,6 +114,7 @@ export function ProductPage() {
   const product = staticProduct || remoteProduct;
   const availableStock = typeof product?.stock === "number" ? Math.max(0, Math.floor(product.stock)) : null;
   const isOutOfStock = availableStock !== null && availableStock <= 0;
+  const isAddDisabled = isOutOfStock || isAdmin;
 
   useEffect(() => {
     if (availableStock === null || availableStock <= 0) {
@@ -258,7 +262,7 @@ export function ProductPage() {
                 <span className="w-10 text-center text-sm">{quantity}</span>
                 <button
                   onClick={() => setQuantity(quantity + 1)}
-                  disabled={isOutOfStock || maxQuantityReached}
+                  disabled={isAddDisabled || maxQuantityReached}
                   className="w-10 h-10 flex items-center justify-center hover:bg-muted disabled:opacity-40"
                 >
                   <Plus className="w-4 h-4" />
@@ -268,19 +272,19 @@ export function ProductPage() {
             <div className="flex gap-3">
               <button
                 onClick={handleAddToCart}
-                disabled={isOutOfStock}
+                disabled={isAddDisabled}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-[#E8400C] dark:bg-[#FF5722] text-white hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <ShoppingCart className="w-4.5 h-4.5" />
-                {isOutOfStock ? "Hors stock" : "Ajouter au panier"}
+                {isAdmin ? "Achat non autorisé (Admin)" : (isOutOfStock ? "Hors stock" : "Ajouter au panier")}
               </button>
               <button
                 onClick={handleBuyNow}
-                disabled={isOutOfStock}
+                disabled={isAddDisabled}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg border-2 border-primary text-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Zap className="w-4.5 h-4.5" />
-                Acheter maintenant
+                {isAdmin ? "Mode Administrateur" : "Acheter maintenant"}
               </button>
             </div>
             <div className="flex gap-4">

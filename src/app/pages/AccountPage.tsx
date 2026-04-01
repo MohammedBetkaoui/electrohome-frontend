@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, Package, Heart, MapPin, MessageSquare, Settings, LogOut, Truck, ReceiptText } from "lucide-react";
+import { LayoutDashboard, Package, Heart, MapPin, MessageSquare, Settings, LogOut, Truck, ReceiptText, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { cancelMyOrder, getCheckoutAddresses, getMyOrder, getMyOrders, type CustomerOrder, type CustomerOrderDetail, type ShippingAddress } from "../api/orders";
+import { createReturn, getMyReturn, getMyReturns, getReturnReasons, type CustomerReturnDetail, type CustomerReturnSummary, type ReturnReason, type ReturnStatus } from "../api/returns";
 import { PRODUCTS, formatPrice, useStore } from "../data/store";
 import { ProductCard } from "../components/ProductCard";
 import { useAuth } from "../context/AuthContext";
@@ -29,8 +30,22 @@ const orderStatusMap: Record<string, { label: string; className: string }> = {
   returned: { label: "Retournée", className: "text-orange-500" },
 };
 
+const returnStatusMap: Record<ReturnStatus, { label: string; className: string }> = {
+  pending: { label: "En attente", className: "text-amber-500" },
+  approved: { label: "Approuvé", className: "text-sky-500" },
+  pickup: { label: "Ramassage", className: "text-violet-500" },
+  received: { label: "Reçu", className: "text-blue-500" },
+  inspecting: { label: "Inspection", className: "text-orange-500" },
+  refunded: { label: "Remboursé", className: "text-emerald-500" },
+  rejected: { label: "Rejeté", className: "text-rose-500" },
+};
+
 function formatOrderStatus(status: string) {
   return orderStatusMap[status] || { label: status, className: "text-muted-foreground" };
+}
+
+function formatReturnStatus(status: ReturnStatus) {
+  return returnStatusMap[status] || { label: status, className: "text-muted-foreground" };
 }
 
 function formatOrderDate(value: string) {
@@ -39,6 +54,154 @@ function formatOrderDate(value: string) {
     month: "2-digit",
     year: "numeric",
   });
+}
+
+type ReturnDraftItem = {
+  productId: number;
+  name: string;
+  sku: string;
+  max: number;
+  quantity: number;
+};
+
+type ReturnDraft = {
+  orderId: number;
+  orderNumber: string;
+  items: ReturnDraftItem[];
+};
+
+function ReturnRequestModal({
+  draft,
+  reasons,
+  isSubmitting,
+  onClose,
+  onSubmit,
+}: {
+  draft: ReturnDraft;
+  reasons: ReturnReason[];
+  isSubmitting: boolean;
+  onClose: () => void;
+  onSubmit: (payload: {
+    reasonId: number;
+    detail: string;
+    items: ReturnDraftItem[];
+    photos: File[];
+  }) => void;
+}) {
+  const [reasonId, setReasonId] = useState<number | "">("");
+  const [detail, setDetail] = useState("");
+  const [items, setItems] = useState<ReturnDraftItem[]>(draft.items);
+  const [photos, setPhotos] = useState<File[]>([]);
+
+  useEffect(() => {
+    setItems(draft.items);
+  }, [draft]);
+
+  useEffect(() => {
+    if (!reasonId && reasons.length > 0) {
+      setReasonId(reasons[0].id);
+    }
+  }, [reasonId, reasons]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[100] flex items-start justify-center pt-6 overflow-y-auto" onClick={onClose}>
+      <div
+        className="bg-white dark:bg-[#1E1E24] rounded-2xl w-full max-w-2xl shadow-2xl m-4 mb-10"
+        style={{ fontFamily: "'Sora', sans-serif" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-6 border-b border-border">
+          <h3 className="text-lg" style={{ fontWeight: 600 }}>Demande de retour · {draft.orderNumber}</h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground">
+            ✕
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          <div>
+            <label className="text-sm mb-1 block" style={{ fontWeight: 500 }}>Motif</label>
+            <select
+              value={reasonId}
+              onChange={(e) => setReasonId(Number(e.target.value))}
+              className="w-full px-4 py-2.5 rounded-lg bg-card border border-border text-sm"
+            >
+              {reasons.length === 0 ? (
+                <option value="">Chargement des motifs...</option>
+              ) : (
+                reasons.map((reason) => (
+                  <option key={reason.id} value={reason.id}>{reason.label}</option>
+                ))
+              )}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm mb-1 block" style={{ fontWeight: 500 }}>Details</label>
+            <textarea
+              value={detail}
+              onChange={(e) => setDetail(e.target.value)}
+              rows={4}
+              className="w-full px-4 py-2.5 rounded-lg bg-card border border-border text-sm resize-none"
+              placeholder="Expliquez le probleme rencontre..."
+            />
+          </div>
+
+          <div>
+            <label className="text-sm mb-2 block" style={{ fontWeight: 500 }}>Articles concernes</label>
+            <div className="space-y-2">
+              {items.map((item, index) => (
+                <div key={item.productId} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border">
+                  <div className="min-w-0">
+                    <p className="text-sm truncate" style={{ fontWeight: 600 }}>{item.name}</p>
+                    <p className="text-xs text-muted-foreground">{item.sku} · Max {item.max}</p>
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    max={item.max}
+                    value={item.quantity}
+                    onChange={(e) => {
+                      const value = Math.max(0, Math.min(item.max, Number(e.target.value)));
+                      setItems((prev) => prev.map((row, i) => i === index ? { ...row, quantity: value } : row));
+                    }}
+                    className="w-20 px-3 py-2 rounded-lg border border-border text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Mettez 0 pour exclure un article du retour.</p>
+          </div>
+
+          <div>
+            <label className="text-sm mb-1 block" style={{ fontWeight: 500 }}>Photos (optionnel)</label>
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={(e) => setPhotos(Array.from(e.target.files || []))}
+              className="block w-full text-sm"
+            />
+            {photos.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">{photos.length} fichier{photos.length > 1 ? "s" : ""} selectionne{photos.length > 1 ? "s" : ""}.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 p-6 border-t border-border">
+          <button onClick={onClose} disabled={isSubmitting} className="px-4 py-2.5 rounded-lg border border-border text-sm text-muted-foreground">
+            Annuler
+          </button>
+          <button
+            onClick={() => reasonId && onSubmit({ reasonId: Number(reasonId), detail, items, photos })}
+            disabled={isSubmitting || !reasonId}
+            className="px-5 py-2.5 rounded-lg bg-[#E8400C] text-white text-sm hover:opacity-90 disabled:opacity-60"
+          >
+            {isSubmitting ? "Envoi..." : "Envoyer la demande"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function AccountPage() {
@@ -51,6 +214,14 @@ export function AccountPage() {
   const [selectedOrder, setSelectedOrder] = useState<CustomerOrderDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [returns, setReturns] = useState<CustomerReturnSummary[]>([]);
+  const [returnsLoading, setReturnsLoading] = useState(false);
+  const [returnReasons, setReturnReasons] = useState<ReturnReason[]>([]);
+  const [selectedReturnId, setSelectedReturnId] = useState<number | null>(null);
+  const [selectedReturn, setSelectedReturn] = useState<CustomerReturnDetail | null>(null);
+  const [returnDetailLoading, setReturnDetailLoading] = useState(false);
+  const [returnDraft, setReturnDraft] = useState<ReturnDraft | null>(null);
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
   const { favorites } = useStore();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -106,6 +277,136 @@ export function AccountPage() {
     }
   };
 
+  const loadReturns = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) {
+      setReturnsLoading(true);
+    }
+
+    try {
+      const data = await getMyReturns();
+      setReturns(data);
+
+      if (data.length === 0) {
+        setSelectedReturnId(null);
+        setSelectedReturn(null);
+        return;
+      }
+
+      if (!selectedReturnId) {
+        setSelectedReturnId(data[0].id);
+      }
+    } catch {
+      if (!silent) {
+        toast.error("Impossible de charger vos retours.");
+      }
+    } finally {
+      if (!silent) {
+        setReturnsLoading(false);
+      }
+    }
+  };
+
+  const loadReturnReasons = async () => {
+    try {
+      const data = await getReturnReasons();
+      setReturnReasons(data);
+    } catch {
+      toast.error("Impossible de charger les motifs de retour.");
+    }
+  };
+
+  const loadReturnDetail = async (returnId: number, { silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) {
+      setReturnDetailLoading(true);
+    }
+
+    try {
+      const detail = await getMyReturn(returnId);
+      setSelectedReturn(detail);
+      setSelectedReturnId(returnId);
+    } catch {
+      if (!silent) {
+        toast.error("Impossible de charger le detail du retour.");
+      }
+    } finally {
+      if (!silent) {
+        setReturnDetailLoading(false);
+      }
+    }
+  };
+
+  const openReturnDraft = () => {
+    if (!selectedOrder) {
+      return;
+    }
+
+    const items: ReturnDraftItem[] = selectedOrder.items
+      .filter((item) => item.product_id)
+      .map((item) => ({
+        productId: item.product_id as number,
+        name: item.product_name,
+        sku: item.product_brand,
+        max: item.quantity,
+        quantity: item.quantity,
+      }));
+
+    if (items.length === 0) {
+      toast.error("Aucun article eligible pour un retour.");
+      return;
+    }
+
+    setReturnDraft({
+      orderId: selectedOrder.id,
+      orderNumber: selectedOrder.order_number,
+      items,
+    });
+  };
+
+  const submitReturn = async (payload: { reasonId: number; detail: string; items: ReturnDraftItem[]; photos: File[] }) => {
+    if (!returnDraft) {
+      return;
+    }
+
+    if (!payload.reasonId) {
+      toast.error("Choisissez un motif de retour.");
+      return;
+    }
+
+    const items = payload.items.filter((item) => item.quantity > 0);
+
+    if (items.length === 0) {
+      toast.error("Selectionnez au moins un article.");
+      return;
+    }
+
+    setReturnSubmitting(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("order_id", String(returnDraft.orderId));
+      formData.append("reason_id", String(payload.reasonId));
+      if (payload.detail) {
+        formData.append("reason_detail", payload.detail);
+      }
+
+      items.forEach((item, index) => {
+        formData.append(`items[${index}][product_id]`, String(item.productId));
+        formData.append(`items[${index}][quantity]`, String(item.quantity));
+      });
+
+      payload.photos.forEach((file) => {
+        formData.append("photos[]", file);
+      });
+
+      await createReturn(formData);
+      
+    } catch {
+      toast.error("Impossible d'envoyer la demande de retour.");
+    } finally {
+      setReturnSubmitting(false);
+    }
+  };
+
   const loadOrderDetail = async (orderId: number, { silent = false }: { silent?: boolean } = {}) => {
     if (!silent) {
       setDetailLoading(true);
@@ -129,6 +430,7 @@ export function AccountPage() {
   useEffect(() => {
     void loadOrders();
     void loadAddresses();
+    void loadReturns();
   }, []);
 
   useEffect(() => {
@@ -136,6 +438,20 @@ export function AccountPage() {
       void loadOrderDetail(selectedOrderId);
     }
   }, [selectedOrderId]);
+
+  useEffect(() => {
+    if (selectedReturnId) {
+      void loadReturnDetail(selectedReturnId);
+    }
+  }, [selectedReturnId]);
+
+  useEffect(() => {
+    if (returnDraft && returnReasons.length === 0) {
+      void loadReturnReasons();
+    }
+  }, [returnDraft, returnReasons.length]);
+
+  
 
   useEffect(() => {
     if (active !== "orders" && active !== "dashboard") {

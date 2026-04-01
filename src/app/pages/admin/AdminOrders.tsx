@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import {
   Search, Eye, X, ChevronLeft, ChevronRight, ArrowUpDown,
@@ -57,378 +58,9 @@ function formatDateTime(date: string) {
 
 const ADMIN_ORDERS_REFRESH_MS = 5000;
 
-// ─── Order Detail Modal ────────────────────────────────────────────────────
-function OrderDetailModal({
-  order,
-  onClose,
-  onStatusChange,
-}: {
-  order: AdminOrderDetail;
-  onClose: () => void;
-  onStatusChange: (id: number, status: OrderStatus, note?: string) => Promise<void>;
-}) {
-  const st = STATUS_CONFIG[order.status];
-  const StatusIcon = st.icon;
-  const [statusNote, setStatusNote] = useState("");
-  const [isChanging, setIsChanging] = useState(false);
-  const [localNotes, setLocalNotes] = useState(order.notes ?? "");
-  const [savingNotes, setSavingNotes] = useState(false);
-
-  const handleStatusChange = async (ns: OrderStatus) => {
-    setIsChanging(true);
-    try {
-      await onStatusChange(order.id, ns, statusNote || undefined);
-      setStatusNote("");
-      toast.success(`Statut mis à jour : ${STATUS_CONFIG[ns].label}`);
-    } catch {
-      toast.error("Erreur lors du changement de statut.");
-    } finally {
-      setIsChanging(false);
-    }
-  };
-
-  const handleSaveNotes = async () => {
-    setSavingNotes(true);
-    try {
-      await updateOrderNotes(order.id, localNotes);
-      toast.success("Notes enregistrées.");
-    } catch {
-      toast.error("Erreur lors de la sauvegarde des notes.");
-    } finally {
-      setSavingNotes(false);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/50 z-[100] flex items-start justify-center pt-6 overflow-y-auto"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white dark:bg-[#1E1E24] rounded-2xl w-full max-w-3xl shadow-2xl m-4 mb-10"
-        style={{ fontFamily: "'Sora', sans-serif" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[#E5E7EB] dark:border-white/10">
-          <div className="flex items-center gap-3">
-            <h2
-              className="text-[17px] text-[#1A2332] dark:text-white"
-              style={{ fontWeight: 600 }}
-            >
-              Commande {order.order_number}
-            </h2>
-            <span
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px]"
-              style={{
-                fontWeight: 500,
-                backgroundColor: st.color + "15",
-                color: st.color,
-              }}
-            >
-              <StatusIcon className="w-3 h-3" />
-              {st.label}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              className="w-8 h-8 rounded-lg bg-[#F3F4F6] dark:bg-white/10 flex items-center justify-center text-[#6B7280]"
-              title="Imprimer"
-            >
-              <Printer className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-lg bg-[#F3F4F6] dark:bg-white/10 flex items-center justify-center text-[#6B7280] hover:text-[#1A2332] dark:hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-          {/* Client + Commande */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-[#F9FAFB] dark:bg-white/5 rounded-xl p-4 space-y-3">
-              <h4
-                className="text-[13px] text-[#1A2332] dark:text-white"
-                style={{ fontWeight: 600 }}
-              >
-                Informations client
-              </h4>
-              <p
-                className="text-[13px] text-[#1A2332] dark:text-white"
-                style={{ fontWeight: 500 }}
-              >
-                {order.client}
-              </p>
-              <div className="space-y-1.5">
-                {order.email && (
-                  <div className="flex items-center gap-2 text-[12px] text-[#6B7280]">
-                    <Mail className="w-3.5 h-3.5" /> {order.email}
-                  </div>
-                )}
-                {order.address?.phone && (
-                  <div className="flex items-center gap-2 text-[12px] text-[#6B7280]">
-                    <Phone className="w-3.5 h-3.5" /> {order.address.phone}
-                  </div>
-                )}
-                {order.address && (
-                  <div className="flex items-start gap-2 text-[12px] text-[#6B7280]">
-                    <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    <span>
-                      {order.address.address}, {order.address.city}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-[#F9FAFB] dark:bg-white/5 rounded-xl p-4 space-y-2">
-              <h4
-                className="text-[13px] text-[#1A2332] dark:text-white"
-                style={{ fontWeight: 600 }}
-              >
-                Détails
-              </h4>
-              <div className="space-y-1.5 text-[12px]">
-                <div className="flex justify-between">
-                  <span className="text-[#6B7280]">Date</span>
-                  <span
-                    className="text-[#1A2332] dark:text-white"
-                    style={{ fontWeight: 500 }}
-                  >
-                    {formatDateTime(order.created_at)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#6B7280]">Livraison</span>
-                  <span
-                    className="text-[#1A2332] dark:text-white"
-                    style={{ fontWeight: 500 }}
-                  >
-                    {order.delivery_method?.label ?? "—"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#6B7280]">Paiement</span>
-                  <span
-                    className="text-[#1A2332] dark:text-white"
-                    style={{ fontWeight: 500 }}
-                  >
-                    {order.payment_method === "cash_on_delivery"
-                      ? "Paiement à la livraison"
-                      : order.payment_method}
-                  </span>
-                </div>
-                {order.estimated_delivery && (
-                  <div className="flex justify-between">
-                    <span className="text-[#6B7280]">Livraison estimée</span>
-                    <span
-                      className="text-[#1A2332] dark:text-white"
-                      style={{ fontWeight: 500 }}
-                    >
-                      {formatShortDate(order.estimated_delivery)}
-                    </span>
-                  </div>
-                )}
-                {order.promo_code && (
-                  <div className="flex justify-between">
-                    <span className="text-[#6B7280]">Code promo</span>
-                    <span
-                      className="text-[#FF6B35]"
-                      style={{ fontWeight: 500 }}
-                    >
-                      {order.promo_code}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Articles */}
-          <div>
-            <h4
-              className="text-[13px] text-[#1A2332] dark:text-white mb-3"
-              style={{ fontWeight: 600 }}
-            >
-              Articles ({order.items?.length ?? 0})
-            </h4>
-            <div className="space-y-2">
-              {order.items?.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-3 bg-[#F9FAFB] dark:bg-white/5 rounded-xl p-3"
-                >
-                  <div className="w-12 h-12 rounded-lg bg-white dark:bg-white/10 overflow-hidden shrink-0 flex items-center justify-center">
-                    <Package className="w-6 h-6 text-[#9CA3AF]" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="text-[13px] text-[#1A2332] dark:text-white truncate"
-                      style={{ fontWeight: 500 }}
-                    >
-                      {item.product_name}
-                    </p>
-                    <p className="text-[11px] text-[#9CA3AF]">
-                      {item.product_brand} · Qté: {item.quantity}
-                    </p>
-                  </div>
-                  <p
-                    className="text-[13px] text-[#1A2332] dark:text-white shrink-0"
-                    style={{ fontWeight: 600 }}
-                  >
-                    {formatPrice(item.subtotal)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Totaux */}
-          <div className="bg-[#F9FAFB] dark:bg-white/5 rounded-xl p-4 space-y-2">
-            <div className="flex justify-between text-[13px]">
-              <span className="text-[#6B7280]">Sous-total</span>
-              <span>{formatPrice(order.subtotal)}</span>
-            </div>
-            <div className="flex justify-between text-[13px]">
-              <span className="text-[#6B7280]">Livraison</span>
-              <span>
-                {order.delivery_cost === 0
-                  ? "Gratuite"
-                  : formatPrice(order.delivery_cost)}
-              </span>
-            </div>
-            {order.discount_amount > 0 && (
-              <div className="flex justify-between text-[13px] text-[#10B981]">
-                <span>Remise</span>
-                <span>- {formatPrice(order.discount_amount)}</span>
-              </div>
-            )}
-            <div
-              className="flex justify-between pt-2 border-t border-[#E5E7EB] dark:border-white/10 text-[15px]"
-              style={{ fontWeight: 600 }}
-            >
-              <span className="text-[#1A2332] dark:text-white">Total TTC</span>
-              <span className="text-[#FF6B35]">{formatPrice(order.total_ttc)}</span>
-            </div>
-          </div>
-
-          {/* Notes internes */}
-          <div>
-            <h4
-              className="text-[13px] text-[#1A2332] dark:text-white mb-2"
-              style={{ fontWeight: 600 }}
-            >
-              Notes internes
-            </h4>
-            <textarea
-              rows={3}
-              value={localNotes}
-              onChange={(e) => setLocalNotes(e.target.value)}
-              placeholder="Ajouter une note interne..."
-              className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] resize-none"
-            />
-            <button
-              onClick={handleSaveNotes}
-              disabled={savingNotes}
-              className="mt-2 px-4 py-1.5 rounded-lg bg-[#F3F4F6] dark:bg-white/10 text-[12px] text-[#6B7280] hover:text-[#1A2332] disabled:opacity-50"
-              style={{ fontWeight: 500 }}
-            >
-              {savingNotes ? "Sauvegarde..." : "Sauvegarder les notes"}
-            </button>
-          </div>
-
-          {/* Historique statuts */}
-          {order.status_history && order.status_history.length > 0 && (
-            <div>
-              <h4
-                className="text-[13px] text-[#1A2332] dark:text-white mb-3"
-                style={{ fontWeight: 600 }}
-              >
-                Historique
-              </h4>
-              <div className="space-y-2">
-                {order.status_history.map((h, i) => {
-                  const hst = STATUS_CONFIG[h.status];
-                  return (
-                    <div
-                      key={i}
-                      className="flex items-start gap-3 bg-[#F9FAFB] dark:bg-white/5 rounded-lg p-3"
-                    >
-                      <span
-                        className="inline-flex px-2 py-0.5 rounded-full text-[10px] shrink-0"
-                        style={{
-                          fontWeight: 500,
-                          backgroundColor: hst.color + "15",
-                          color: hst.color,
-                        }}
-                      >
-                        {hst.label}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        {h.note && (
-                          <p className="text-[12px] text-[#6B7280]">{h.note}</p>
-                        )}
-                        <p className="text-[10px] text-[#9CA3AF] mt-0.5">
-                          {h.created_by?.name ?? "Système"} ·{" "}
-                          {h.created_at ? formatDateTime(h.created_at) : ""}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Actions de statut */}
-          {order.next_statuses && order.next_statuses.length > 0 && (
-            <div className="space-y-3 pt-2 border-t border-[#E5E7EB] dark:border-white/10">
-              <h4
-                className="text-[13px] text-[#1A2332] dark:text-white"
-                style={{ fontWeight: 600 }}
-              >
-                Changer le statut
-              </h4>
-              <input
-                value={statusNote}
-                onChange={(e) => setStatusNote(e.target.value)}
-                placeholder="Note optionnelle (visible dans l'historique)..."
-                className="w-full px-3 py-2 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] outline-none focus:border-[#FF6B35] text-[#1A2332] dark:text-white"
-              />
-              <div className="flex flex-wrap gap-2">
-                {order.next_statuses.map((ns) => {
-                  const nsc = STATUS_CONFIG[ns];
-                  return (
-                    <button
-                      key={ns}
-                      onClick={() => handleStatusChange(ns)}
-                      disabled={isChanging}
-                      className="px-4 py-2 rounded-lg text-[12px] border transition-colors disabled:opacity-50"
-                      style={{
-                        fontWeight: 500,
-                        borderColor: nsc.color + "40",
-                        color: nsc.color,
-                        backgroundColor: nsc.color + "08",
-                      }}
-                    >
-                      {nsc.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Page ─────────────────────────────────────────────────────────────
 export function AdminOrders() {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [stats, setStats] = useState<AdminOrderStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -444,9 +76,6 @@ export function AdminOrders() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Modal
-  const [detailOrder, setDetailOrder] = useState<AdminOrderDetail | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const perPage = 10;
 
@@ -510,41 +139,10 @@ export function AdminOrders() {
   };
 
   // Ouvrir le détail
-  const openDetail = async (id: number, { silent = false }: { silent?: boolean } = {}) => {
-    if (!silent) {
-      setLoadingDetail(true);
-    }
-
-    try {
-      const detail = await getOrder(id);
-      setDetailOrder(detail);
-    } catch {
-      if (!silent) {
-        toast.error("Impossible de charger les détails.");
-      }
-    } finally {
-      if (!silent) {
-        setLoadingDetail(false);
-      }
-    }
+  const openDetail = (id: number) => {
+    navigate(`/admin/commandes/${id}`);
   };
 
-  // Changer statut depuis modal
-  const handleStatusChange = async (
-    id: number,
-    status: OrderStatus,
-    note?: string
-  ) => {
-    const updated = await updateOrderStatus(id, status, note);
-    setDetailOrder(updated);
-    setOrders((prev) =>
-      prev.map((order) => (order.id === id ? { ...order, status: updated.status } : order))
-    );
-    await Promise.all([
-      loadOrders({ silent: true }),
-      loadStats(),
-    ]);
-  };
 
   useEffect(() => {
     loadStats();
@@ -570,9 +168,7 @@ export function AdminOrders() {
           loadStats(),
         ]);
 
-        if (detailOrder?.id) {
-          await openDetail(detailOrder.id, { silent: true });
-        }
+
       } finally {
         polling = false;
       }
@@ -600,7 +196,7 @@ export function AdminOrders() {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [debouncedSearch, statusFilter, sortField, sortDir, page, detailOrder?.id]);
+  }, [debouncedSearch, statusFilter, sortField, sortDir, page]);
 
   const toggleSort = (field: typeof sortField) => {
     if (sortField === field) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -705,7 +301,7 @@ export function AdminOrders() {
                 void Promise.all([
                   loadOrders({ silent: true, showRefreshState: true }),
                   loadStats(),
-                  detailOrder?.id ? openDetail(detailOrder.id, { silent: true }) : Promise.resolve(),
+                  Promise.resolve(),
                 ]);
               }}
               disabled={isRefreshing}
@@ -888,7 +484,7 @@ export function AdminOrders() {
                           <td className="px-4 py-3">
                             <button
                               onClick={() => openDetail(o.id)}
-                              disabled={loadingDetail}
+                              
                               className="w-8 h-8 rounded-lg hover:bg-[#F3F4F6] dark:hover:bg-white/10 flex items-center justify-center text-[#9CA3AF] hover:text-[#FF6B35] transition-colors disabled:opacity-50"
                             >
                               <Eye className="w-4 h-4" />
@@ -947,14 +543,6 @@ export function AdminOrders() {
         )}
       </div>
 
-      {/* Detail Modal */}
-      {detailOrder && (
-        <OrderDetailModal
-          order={detailOrder}
-          onClose={() => setDetailOrder(null)}
-          onStatusChange={handleStatusChange}
-        />
-      )}
-    </div>
+        </div>
   );
 }

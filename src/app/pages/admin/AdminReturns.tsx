@@ -1,42 +1,19 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Search, Eye, X, ChevronLeft, ChevronRight, ArrowUpDown,
   RotateCcw, Clock, CheckCircle2, XCircle, Package, Truck,
   AlertTriangle, Mail, Phone, MapPin, Download, Printer,
-  Camera, MessageSquare, RefreshCw, Ban, CreditCard, MoreVertical
+  Camera, MessageSquare, RefreshCw, CreditCard
 } from "lucide-react";
-import { IMAGES } from "../../data/store";
+import { toast } from "sonner";
+import {
+  getReturn,
+  getReturns,
+  updateReturnStatus,
+  type AdminReturn,
+  type ReturnStatus,
+} from "../../api/adminReturns";
 
-// ─── Types ───
-type ReturnStatus = "pending" | "approved" | "pickup" | "received" | "inspecting" | "refunded" | "rejected";
-
-interface ReturnItem {
-  name: string;
-  sku: string;
-  image: string;
-  price: number;
-  quantity: number;
-}
-
-interface AdminReturn {
-  id: string;
-  orderId: string;
-  client: string;
-  email: string;
-  phone: string;
-  address: string;
-  wilaya: string;
-  items: ReturnItem[];
-  reason: string;
-  reasonDetail: string;
-  status: ReturnStatus;
-  refundAmount: number;
-  refundMethod: string;
-  createdAt: string;
-  updatedAt: string;
-  photos?: number;
-  adminNotes?: string;
-}
 
 const STATUS_CONFIG: Record<ReturnStatus, { label: string; color: string; icon: any }> = {
   pending: { label: "En attente", color: "#F59E0B", icon: Clock },
@@ -55,83 +32,9 @@ const REASON_LABELS: Record<string, string> = {
   not_as_described: "Non conforme à la description",
   changed_mind: "Changement d'avis",
   late_delivery: "Livraison trop tardive",
+  refused_delivery: "Refuse a la livraison",
+  customer_absent: "Client absent",
 };
-
-// ─── Mock Data ───
-const MOCK_RETURNS: AdminReturn[] = [
-  {
-    id: "RET-0087", orderId: "CMD-2832", client: "Imane Cherif", email: "i.cherif@email.com", phone: "0660 99 88 77",
-    address: "Boulevard Emir Abdelkader, N°18", wilaya: "Bordj Bou Arréridj",
-    items: [{ name: "Réfrigérateur Multi-Portes RF23", sku: "SAM-RF23-001", image: IMAGES.fridge, price: 189000, quantity: 1 }],
-    reason: "defective", reasonDetail: "Le compresseur fait un bruit anormal depuis la première utilisation. Le réfrigérateur ne refroidit pas correctement côté congélateur.",
-    status: "inspecting", refundAmount: 189000, refundMethod: "Virement bancaire",
-    createdAt: "2026-03-23T10:00:00", updatedAt: "2026-03-25T14:30:00", photos: 3,
-    adminNotes: "Produit reçu le 25/03. Bruit confirmé lors de l'inspection initiale. En attente diagnostic technique.",
-  },
-  {
-    id: "RET-0086", orderId: "CMD-2820", client: "Samir Belkacem", email: "s.belkacem@email.com", phone: "0555 77 66 55",
-    address: "Cité 300 logements, Bloc G2, Apt 6", wilaya: "Bordj Bou Arréridj",
-    items: [{ name: "TV OLED 55\" C3", sku: "LG-OLED55-008", image: IMAGES.tv, price: 203000, quantity: 1 }],
-    reason: "damaged", reasonDetail: "L'écran présente une fissure visible de 15cm en bas à droite. L'emballage extérieur était intact mais l'emballage intérieur était insuffisant.",
-    status: "refunded", refundAmount: 203000, refundMethod: "CIB / Edahabia",
-    createdAt: "2026-03-20T08:30:00", updatedAt: "2026-03-24T16:00:00", photos: 5,
-    adminNotes: "Dommage confirmé. Réclamation transporteur en cours. Remboursement effectué le 24/03.",
-  },
-  {
-    id: "RET-0085", orderId: "CMD-2810", client: "Houda Meziane", email: "h.meziane@email.com", phone: "0661 44 33 22",
-    address: "Hai El Moudjahidine, Villa 22", wilaya: "Bordj Bou Arréridj",
-    items: [{ name: "Lave-linge EcoSilence 9kg", sku: "BOS-ECO9-002", image: IMAGES.washer, price: 109000, quantity: 1 }],
-    reason: "wrong_item", reasonDetail: "J'ai commandé le modèle 9kg (BOS-ECO9-002) mais j'ai reçu le modèle 7kg (BOS-ECO7-015). L'étiquette sur la boîte est correcte mais le contenu ne correspond pas.",
-    status: "pickup", refundAmount: 109000, refundMethod: "Échange produit",
-    createdAt: "2026-03-22T14:15:00", updatedAt: "2026-03-25T09:00:00", photos: 2,
-    adminNotes: "Erreur d'entrepôt confirmée. Échange programmé pour le 27/03. Livreur contacté.",
-  },
-  {
-    id: "RET-0084", orderId: "CMD-2798", client: "Amine Dahmani", email: "a.dahmani@email.com", phone: "0770 22 11 00",
-    address: "Rue Colonel Amirouche, N°33", wilaya: "Bordj Bou Arréridj",
-    items: [{ name: "Aspirateur Robot S7 MaxV", sku: "ROB-S7MV-006", image: IMAGES.vacuum, price: 80000, quantity: 1 }],
-    reason: "defective", reasonDetail: "Le robot ne retourne plus à sa base de chargement. Il tourne en rond pendant 10 minutes puis s'éteint. Le capteur LiDAR semble défaillant.",
-    status: "approved", refundAmount: 80000, refundMethod: "Virement bancaire",
-    createdAt: "2026-03-24T11:30:00", updatedAt: "2026-03-25T10:45:00", photos: 1,
-  },
-  {
-    id: "RET-0083", orderId: "CMD-2785", client: "Nawal Bouazza", email: "n.bouazza@email.com", phone: "0550 88 99 00",
-    address: "Cité Zhun 2, Bloc C3, Apt 10", wilaya: "Bordj Bou Arréridj",
-    items: [{ name: "Machine à Expresso Automatique", sku: "DEL-EXP-007", image: IMAGES.coffee, price: 69000, quantity: 1 }],
-    reason: "not_as_described", reasonDetail: "La fiche produit indique un broyeur intégré en céramique mais le produit reçu a un broyeur en acier. De plus, le réservoir est de 1.2L et non 1.8L comme annoncé.",
-    status: "pending", refundAmount: 69000, refundMethod: "Paiement à la livraison",
-    createdAt: "2026-03-25T16:00:00", updatedAt: "2026-03-25T16:00:00", photos: 4,
-  },
-  {
-    id: "RET-0082", orderId: "CMD-2775", client: "Bilal Ferhat", email: "b.ferhat@email.com", phone: "0660 11 22 33",
-    address: "Hai Benhamouda, Rue 8, N°15", wilaya: "Bordj Bou Arréridj",
-    items: [{ name: "Climatiseur Mural Inverter", sku: "LG-INV12-004", image: IMAGES.ac, price: 94000, quantity: 1 }],
-    reason: "changed_mind", reasonDetail: "Après installation, je me suis rendu compte que 12000 BTU est insuffisant pour mon salon de 40m². Je souhaite un échange contre un modèle 18000 BTU.",
-    status: "rejected", refundAmount: 0, refundMethod: "N/A",
-    createdAt: "2026-03-21T09:00:00", updatedAt: "2026-03-23T11:30:00",
-    adminNotes: "Retour rejeté : produit installé et utilisé. Le changement d'avis après installation n'est pas couvert par notre politique de retour. Client informé des options d'échange avec supplément.",
-  },
-  {
-    id: "RET-0081", orderId: "CMD-2760", client: "Meriem Slimani", email: "m.slimani@email.com", phone: "0555 99 88 77",
-    address: "Cité 1000 logements, Bloc H4, Apt 2", wilaya: "Bordj Bou Arréridj",
-    items: [
-      { name: "Four Multifonction Pyrolyse", sku: "SIE-PYR-003", image: IMAGES.oven, price: 130000, quantity: 1 },
-    ],
-    reason: "damaged", reasonDetail: "La porte du four est arrivée avec la vitre intérieure cassée. L'emballage extérieur présentait des signes de choc.",
-    status: "received", refundAmount: 130000, refundMethod: "Virement bancaire",
-    createdAt: "2026-03-19T13:45:00", updatedAt: "2026-03-24T08:00:00", photos: 6,
-    adminNotes: "Colis endommagé par le transporteur. Photos du colis prises à réception. En attente d'inspection complète.",
-  },
-  {
-    id: "RET-0080", orderId: "CMD-2745", client: "Riad Benmoussa", email: "r.benmoussa@email.com", phone: "0770 44 55 66",
-    address: "Rue Abane Ramdane, N°7", wilaya: "Bordj Bou Arréridj",
-    items: [{ name: "Lave-vaisselle Silence Plus", sku: "MIE-SIL14-005", image: IMAGES.dishwasher, price: 174000, quantity: 1 }],
-    reason: "defective", reasonDetail: "Le lave-vaisselle fuit au niveau du joint de porte après chaque cycle. Le problème persiste même après avoir vérifié que la porte est bien fermée.",
-    status: "refunded", refundAmount: 174000, refundMethod: "CIB / Edahabia",
-    createdAt: "2026-03-15T10:20:00", updatedAt: "2026-03-22T15:00:00", photos: 2,
-    adminNotes: "Défaut de fabrication confirmé (joint de porte). Remboursement effectué. Produit renvoyé au fournisseur.",
-  },
-];
 
 function formatPrice(price: number) {
   return price.toLocaleString("fr-DZ") + " DA";
@@ -151,7 +54,7 @@ function ReturnDetailModal({
 }: {
   ret: AdminReturn;
   onClose: () => void;
-  onStatusChange: (id: string, status: ReturnStatus) => void;
+  onStatusChange: (id: number, status: ReturnStatus) => void;
 }) {
   const st = STATUS_CONFIG[ret.status];
   const StatusIcon = st.icon;
@@ -315,7 +218,7 @@ function ReturnDetailModal({
             <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="w-4 h-4 text-[#D97706]" />
               <p className="text-[12px] text-[#92400E] dark:text-[#F59E0B]" style={{ fontWeight: 600 }}>
-                Motif : {REASON_LABELS[ret.reason] || ret.reason}
+                Motif : {ret.reasonLabel || REASON_LABELS[ret.reason || ""] || ret.reason}
               </p>
             </div>
             <p className="text-[13px] text-[#78350F] dark:text-[#FCD34D]">{ret.reasonDetail}</p>
@@ -327,8 +230,12 @@ function ReturnDetailModal({
             <div className="space-y-2">
               {ret.items.map((item) => (
                 <div key={item.sku} className="flex items-center gap-3 bg-[#F9FAFB] dark:bg-white/5 rounded-xl p-3">
-                  <div className="w-12 h-12 rounded-lg bg-white dark:bg-white/10 overflow-hidden shrink-0">
-                    <img src={item.image} alt="" className="w-full h-full object-cover" />
+                  <div className="w-12 h-12 rounded-lg bg-white dark:bg-white/10 overflow-hidden shrink-0 flex items-center justify-center">
+                    {item.image ? (
+                      <img src={item.image} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <Package className="w-5 h-5 text-[#9CA3AF]" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] text-[#1A2332] dark:text-white truncate" style={{ fontWeight: 500 }}>{item.name}</p>
@@ -372,7 +279,7 @@ function ReturnDetailModal({
                 return (
                   <button
                     key={ns}
-                    onClick={() => onStatusChange(ret.id, ns)}
+                    onClick={() => onStatusChange(ret.returnId, ns)}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] border transition-colors"
                     style={{ fontWeight: 500, borderColor: nsc.color + "40", color: nsc.color, backgroundColor: nsc.color + "08" }}
                   >
@@ -391,7 +298,9 @@ function ReturnDetailModal({
 
 // ─── Main Page ───
 export function AdminReturns() {
-  const [returns, setReturns] = useState<AdminReturn[]>(MOCK_RETURNS);
+  const [returns, setReturns] = useState<AdminReturn[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [reasonFilter, setReasonFilter] = useState("all");
@@ -401,11 +310,44 @@ export function AdminReturns() {
   const [detailReturn, setDetailReturn] = useState<AdminReturn | null>(null);
   const perPage = 8;
 
+  const loadReturns = async () => {
+    setIsLoading(true);
+    try {
+      const res = await getReturns({ per_page: 200 });
+      setReturns(res.data);
+    } catch {
+      toast.error("Impossible de charger les retours.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openDetail = async (returnId: number) => {
+    setDetailLoading(true);
+    try {
+      const detail = await getReturn(returnId);
+      setDetailReturn(detail);
+    } catch {
+      toast.error("Impossible de charger le detail du retour.");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReturns();
+  }, []);
+
   const filtered = useMemo(() => {
     let list = [...returns];
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter((r) => r.id.toLowerCase().includes(q) || r.orderId.toLowerCase().includes(q) || r.client.toLowerCase().includes(q));
+      list = list.filter((r) => {
+        const orderId = r.orderId ? r.orderId.toLowerCase() : "";
+        return r.id.toLowerCase().includes(q)
+          || orderId.includes(q)
+          || r.client.toLowerCase().includes(q);
+      });
     }
     if (statusFilter !== "all") list = list.filter((r) => r.status === statusFilter);
     if (reasonFilter !== "all") list = list.filter((r) => r.reason === reasonFilter);
@@ -425,9 +367,15 @@ export function AdminReturns() {
     else { setSortField(field); setSortDir("desc"); }
   };
 
-  const handleStatusChange = (id: string, newStatus: ReturnStatus) => {
-    setReturns((prev) => prev.map((r) => r.id === id ? { ...r, status: newStatus, updatedAt: new Date().toISOString() } : r));
-    setDetailReturn((prev) => prev && prev.id === id ? { ...prev, status: newStatus, updatedAt: new Date().toISOString() } : prev);
+  const handleStatusChange = async (returnId: number, newStatus: ReturnStatus) => {
+    try {
+      const updated = await updateReturnStatus(returnId, newStatus);
+      setReturns((prev) => prev.map((r) => r.returnId === returnId ? updated : r));
+      setDetailReturn((prev) => (prev && prev.returnId === returnId ? updated : prev));
+      toast.success("Statut mis a jour.");
+    } catch {
+      toast.error("Erreur lors de la mise a jour du statut.");
+    }
   };
 
   const statusCounts = useMemo(() => {
@@ -438,6 +386,14 @@ export function AdminReturns() {
 
   const pendingRefundTotal = returns.filter((r) => !["refunded", "rejected"].includes(r.status)).reduce((s, r) => s + r.refundAmount, 0);
   const refundedTotal = returns.filter((r) => r.status === "refunded").reduce((s, r) => s + r.refundAmount, 0);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="w-8 h-8 border-2 border-[#FF6B35] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5" style={{ fontFamily: "'Sora', sans-serif" }}>
@@ -541,14 +497,22 @@ export function AdminReturns() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-[#F3F4F6] dark:bg-white/10 overflow-hidden shrink-0">
-                          <img src={r.items[0].image} alt="" className="w-full h-full object-cover" />
+                        <div className="w-8 h-8 rounded-lg bg-[#F3F4F6] dark:bg-white/10 overflow-hidden shrink-0 flex items-center justify-center">
+                          {r.items[0]?.image ? (
+                            <img src={r.items[0].image} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <Package className="w-4 h-4 text-[#9CA3AF]" />
+                          )}
                         </div>
-                        <p className="text-[12px] text-[#6B7280] dark:text-white/60 truncate max-w-[140px]">{r.items[0].name}</p>
+                        <p className="text-[12px] text-[#6B7280] dark:text-white/60 truncate max-w-[140px]">
+                          {r.items[0]?.name || "—"}
+                        </p>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-[12px] text-[#6B7280] dark:text-white/60">{REASON_LABELS[r.reason] || r.reason}</span>
+                      <span className="text-[12px] text-[#6B7280] dark:text-white/60">
+                        {r.reasonLabel || REASON_LABELS[r.reason || ""] || r.reason || "—"}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-[#1A2332] dark:text-white" style={{ fontWeight: 600 }}>
                       {r.refundAmount > 0 ? formatPrice(r.refundAmount) : "—"}
@@ -561,7 +525,11 @@ export function AdminReturns() {
                     </td>
                     <td className="px-4 py-3 text-[12px] text-[#9CA3AF]">{formatDate(r.createdAt)}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => setDetailReturn(r)} className="w-8 h-8 rounded-lg hover:bg-[#F3F4F6] dark:hover:bg-white/10 flex items-center justify-center text-[#9CA3AF] hover:text-[#FF6B35] transition-colors">
+                      <button
+                        onClick={() => openDetail(r.returnId)}
+                        disabled={detailLoading}
+                        className="w-8 h-8 rounded-lg hover:bg-[#F3F4F6] dark:hover:bg-white/10 flex items-center justify-center text-[#9CA3AF] hover:text-[#FF6B35] transition-colors disabled:opacity-50"
+                      >
                         <Eye className="w-4 h-4" />
                       </button>
                     </td>
