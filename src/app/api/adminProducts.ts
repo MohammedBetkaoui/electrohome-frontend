@@ -61,7 +61,9 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.message || "Une erreur est survenue");
+    const error: any = new Error(data.message || "Une erreur est survenue");
+    error.data = data;
+    throw error;
   }
 
   return data;
@@ -75,6 +77,11 @@ export async function getReferences(): Promise<ReferencesData> {
 export async function getProducts(): Promise<AdminProduct[]> {
   const res = await fetchWithAuth("/products");
   return res.data; // map happens in Laravel
+}
+
+export async function getProduct(id: number): Promise<AdminProduct> {
+  const res = await fetchWithAuth(`/products/${id}`);
+  return res.data;
 }
 
 // FormData expected for file upload

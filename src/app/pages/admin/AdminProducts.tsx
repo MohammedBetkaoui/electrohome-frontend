@@ -5,14 +5,13 @@ import {
   ChevronLeft, ChevronRight, Upload, Package, AlertTriangle, CheckCircle2,
   ArrowUpDown, Grid3X3, List, Image as ImageIcon
 } from "lucide-react";
+import { useNavigate } from "react-router";
 import {
   AdminProduct,
   BrandRef,
   CategoryRef,
   getProducts,
   getReferences,
-  createProduct,
-  updateProduct,
   deleteProduct
 } from "../../api/adminProducts";
 
@@ -27,230 +26,18 @@ function formatPrice(price: number) {
 }
 
 // ─── Product Form Modal ───
-function ProductFormModal({
-  product,
-  brands,
-  categories,
-  onClose,
-  onSave,
-}: {
-  product: AdminProduct | null;
-  brands: BrandRef[];
-  categories: CategoryRef[];
-  onClose: () => void;
-  onSave: (data: FormData, id?: number) => Promise<void>;
-}) {
-  const isEdit = !!product;
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [form, setForm] = useState({
-    name: product?.name || "",
-    sku: product?.sku || "",
-    brand_id: product?.brand_id || (brands.length > 0 ? brands[0].id : 0),
-    category_id: product?.category_id || (categories.length > 0 ? categories[0].id : 0),
-    price: product?.price?.toString() || "",
-    oldPrice: product?.oldPrice?.toString() || "",
-    stock: product?.stock?.toString() || "0",
-    status: product?.status || "active",
-    energy: product?.energy || "A+",
-    specs: product?.specs || "",
-    description: product?.description || "",
-  });
-
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(product?.image || null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
-    }
-  };
-
-  const set = (key: keyof typeof form, value: any) => setForm({ ...form, [key]: value });
-
-  const handleSubmit = async () => {
-    if (!form.name || !form.price || !form.brand_id || !form.category_id) {
-      toast.error("Veuillez remplir tous les champs obligatoires");
-      return;
-    }
-
-    const data = new FormData();
-    data.append("name", form.name);
-    data.append("sku", form.sku);
-    data.append("brand_id", form.brand_id.toString());
-    data.append("category_id", form.category_id.toString());
-    data.append("price", form.price);
-    if (form.oldPrice) data.append("oldPrice", form.oldPrice);
-    data.append("stock", form.stock);
-    data.append("status", form.status);
-    data.append("energy", form.energy);
-    data.append("specs", form.specs);
-    data.append("description", form.description);
-
-    if (imageFile) {
-      data.append("image_file", imageFile);
-    }
-
-    setIsSubmitting(true);
-    try {
-      await onSave(data, product?.id);
-    } catch (e: any) {
-      toast.error(e.message || "Erreur de sauvegarde");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 z-[100] flex items-start justify-center pt-10 overflow-y-auto" onClick={onClose}>
-      <div
-        className="bg-white dark:bg-[#1E1E24] rounded-2xl w-full max-w-2xl shadow-2xl m-4"
-        style={{ fontFamily: "'Sora', sans-serif" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[#E5E7EB] dark:border-white/10">
-          <h2 className="text-[17px] text-[#1A2332] dark:text-white" style={{ fontWeight: 600 }}>
-            {isEdit ? "Modifier le produit" : "Ajouter un produit"}
-          </h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-[#F3F4F6] dark:bg-white/10 flex items-center justify-center text-[#6B7280] hover:text-[#1A2332] dark:hover:text-white">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
-          {/* Image Upload */}
-          <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-xl bg-[#F3F4F6] dark:bg-white/10 overflow-hidden shrink-0">
-              {imagePreview ? (
-                <img src={imagePreview} alt="Aperçu" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-[#9CA3AF]">
-                  <ImageIcon className="w-8 h-8" />
-                </div>
-              )}
-            </div>
-            <div className="flex-1">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-[#D1D5DB] dark:border-white/20 text-[13px] text-[#6B7280] hover:border-[#FF6B35] hover:text-[#FF6B35] transition-colors"
-              >
-                <Upload className="w-4 h-4" />
-                {imageFile ? imageFile.name : "Télécharger une image"}
-              </button>
-              <p className="text-[11px] text-[#9CA3AF] mt-1">PNG, JPG, WEBP — Max 2MB</p>
-            </div>
-          </div>
-
-          {/* Name + SKU */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Nom du produit *</label>
-              <input value={form.name} onChange={(e) => set("name", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="Ex: Réfrigérateur Multi-Portes" />
-            </div>
-            <div>
-              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>SKU</label>
-              <input value={form.sku} onChange={(e) => set("sku", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="Ex: SAM-RF23-001" />
-            </div>
-          </div>
-
-          {/* Brand + Category */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Marque *</label>
-              <select value={form.brand_id} onChange={(e) => set("brand_id", Number(e.target.value))} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors">
-                {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Catégorie *</label>
-              <select value={form.category_id} onChange={(e) => set("category_id", Number(e.target.value))} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors">
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Price + OldPrice + Stock */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Prix (DA) *</label>
-              <input type="number" value={form.price} onChange={(e) => set("price", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="189000" />
-            </div>
-            <div>
-              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Ancien prix (DA)</label>
-              <input type="number" value={form.oldPrice} onChange={(e) => set("oldPrice", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="232000" />
-            </div>
-            <div>
-              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Stock</label>
-              <input type="number" value={form.stock} onChange={(e) => set("stock", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="24" />
-            </div>
-          </div>
-
-          {/* Energy + Status */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Classe énergétique</label>
-              <select value={form.energy} onChange={(e) => set("energy", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors">
-                {["A+++", "A++", "A+", "A", "B", "C", "D", "E", "F", "G"].map((e) => <option key={e} value={e}>{e}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Statut</label>
-              <select value={form.status} onChange={(e) => set("status", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors">
-                <option value="active">Actif</option>
-                <option value="draft">Brouillon</option>
-                <option value="outofstock">Rupture de stock</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Specs */}
-          <div>
-            <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Spécifications</label>
-            <input value={form.specs} onChange={(e) => set("specs", e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="634L, No Frost, A+++" />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Description</label>
-            <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} className="w-full px-3 py-2.5 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors resize-none" placeholder="Description détaillée du produit..." />
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-[#E5E7EB] dark:border-white/10">
-          <button onClick={onClose} disabled={isSubmitting} className="px-5 py-2.5 rounded-lg text-[13px] text-[#6B7280] hover:bg-[#F3F4F6] dark:hover:bg-white/5 transition-colors disabled:opacity-50" style={{ fontWeight: 500 }}>
-            Annuler
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#FF6B35] text-white text-[13px] hover:bg-[#E55A2B] transition-colors disabled:opacity-50"
-            style={{ fontWeight: 500 }}
-          >
-            {isSubmitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-            {isEdit ? "Mettre à jour" : "Ajouter"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Delete Confirm Modal ───
-function DeleteModal({ product, onClose, onConfirm }: { product: AdminProduct; onClose: () => void; onConfirm: () => void }) {
+function DeleteModal({ product, onClose, onConfirm }: { product: AdminProduct; onClose: () => void; onConfirm: () => Promise<boolean | void> }) {
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center" onClick={onClose}>
@@ -258,18 +45,16 @@ function DeleteModal({ product, onClose, onConfirm }: { product: AdminProduct; o
         <div className="w-12 h-12 rounded-full bg-[#EF4444]/10 flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="w-6 h-6 text-[#EF4444]" />
         </div>
-        <h3 className="text-[15px] text-[#1A2332] dark:text-white text-center mb-2" style={{ fontWeight: 600 }}>Supprimer ce produit ?</h3>
+        <h3 className="text-[15px] text-[#1A2332] dark:text-white text-center mb-2" style={{ fontWeight: 600 }}>
+          Supprimer ce produit ?
+        </h3>
         <p className="text-[13px] text-[#6B7280] dark:text-white/50 text-center mb-6">
-          « {product.name} » sera définitivement supprimé. Cette action est irréversible.
+          « {product.name} » sera retiré du catalogue, mais restera conservé dans l'historique de vos factures clients.
         </p>
         <div className="flex gap-3">
           <button onClick={onClose} disabled={isDeleting} className="flex-1 py-2.5 rounded-lg text-[13px] border border-[#E5E7EB] dark:border-white/10 text-[#6B7280] hover:bg-[#F3F4F6] transition-colors disabled:opacity-50" style={{ fontWeight: 500 }}>Annuler</button>
           <button 
-            onClick={async () => {
-              setIsDeleting(true);
-              await onConfirm();
-              setIsDeleting(false);
-            }} 
+            onClick={handleConfirm} 
             disabled={isDeleting}
             className="flex items-center justify-center gap-2 flex-1 py-2.5 rounded-lg bg-[#EF4444] text-white text-[13px] hover:bg-[#DC2626] transition-colors disabled:opacity-50" 
             style={{ fontWeight: 500 }}
@@ -284,6 +69,7 @@ function DeleteModal({ product, onClose, onConfirm }: { product: AdminProduct; o
 
 // ─── Main Page ───
 export function AdminProducts() {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [brands, setBrands] = useState<BrandRef[]>([]);
   const [categories, setCategories] = useState<CategoryRef[]>([]);
@@ -296,7 +82,6 @@ export function AdminProducts() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [page, setPage] = useState(1);
-  const [formModal, setFormModal] = useState<{ open: boolean; product: AdminProduct | null }>({ open: false, product: null });
   const [deleteModal, setDeleteModal] = useState<AdminProduct | null>(null);
   const [actionMenu, setActionMenu] = useState<number | null>(null);
   const perPage = 8;
@@ -351,7 +136,7 @@ export function AdminProducts() {
         await createProduct(data);
         toast.success("Produit ajouté avec succès");
       }
-      setFormModal({ open: false, product: null });
+      
       loadData(); // Recharger les produits depuis l'API
     } catch (e: any) {
       toast.error(e.message || "Erreur lors de la sauvegarde du produit.");
@@ -439,7 +224,7 @@ export function AdminProducts() {
               </button>
             </div>
             {/* Add Product */}
-            <button onClick={() => setFormModal({ open: true, product: null })} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#FF6B35] text-white text-[13px] hover:bg-[#E55A2B] transition-colors" style={{ fontWeight: 500 }}>
+            <button onClick={() => navigate("/admin/produits/nouveau")} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#FF6B35] text-white text-[13px] hover:bg-[#E55A2B] transition-colors" style={{ fontWeight: 500 }}>
               <Plus className="w-4 h-4" />
               Ajouter
             </button>
@@ -510,7 +295,7 @@ export function AdminProducts() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
-                            onClick={() => setFormModal({ open: true, product: p })}
+                            onClick={() => navigate(`/admin/produits/modifier/${p.id}`)}
                             className="w-8 h-8 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-[#FF6B35]/10 hover:text-[#FF6B35] transition-colors"
                             title="Modifier"
                           >
@@ -570,7 +355,7 @@ export function AdminProducts() {
                     {st.label}
                   </span>
                   <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => setFormModal({ open: true, product: p })} className="w-7 h-7 rounded-lg bg-white/90 dark:bg-black/50 flex items-center justify-center text-[#6B7280] hover:text-[#FF6B35]">
+                    <button onClick={() => navigate(`/admin/produits/modifier/${p.id}`)} className="w-7 h-7 rounded-lg bg-white/90 dark:bg-black/50 flex items-center justify-center text-[#6B7280] hover:text-[#FF6B35]">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button onClick={() => setDeleteModal(p)} className="w-7 h-7 rounded-lg bg-white/90 dark:bg-black/50 flex items-center justify-center text-[#6B7280] hover:text-[#EF4444]">
@@ -610,7 +395,6 @@ export function AdminProducts() {
       )}
 
       {/* Modals */}
-      {formModal.open && <ProductFormModal product={formModal.product} brands={brands} categories={categories} onClose={() => setFormModal({ open: false, product: null })} onSave={handleSaveProduct} />}
       {deleteModal && <DeleteModal product={deleteModal} onClose={() => setDeleteModal(null)} onConfirm={handleDeleteProduct} />}
     </div>
   );

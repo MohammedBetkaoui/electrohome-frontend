@@ -1,16 +1,11 @@
 import { Bell, Search, Moon, Sun, Menu, ExternalLink } from "lucide-react";
-import { useState } from "react";
 import { Link } from "react-router";
 import { useSidebar } from "./AdminLayout";
+import { useStore } from "../../data/store";
 
 export function AdminTopbar({ title }: { title: string }) {
-  const [dark, setDark] = useState(false);
+  const { darkMode, toggleDarkMode } = useStore();
   const { setMobileOpen } = useSidebar();
-
-  const toggleDark = () => {
-    setDark(!dark);
-    document.documentElement.classList.toggle("dark", !dark);
-  };
 
   return (
     <header
@@ -46,10 +41,11 @@ export function AdminTopbar({ title }: { title: string }) {
           Voir le site
         </Link>
         <button
-          onClick={toggleDark}
+          onClick={toggleDarkMode}
           className="w-9 h-9 rounded-lg bg-[#F3F4F6] dark:bg-white/10 flex items-center justify-center text-[#6B7280] dark:text-white/60 hover:text-[#1A2332] dark:hover:text-white transition-colors"
+          title={darkMode ? "Passer en mode clair" : "Passer en mode sombre"}
         >
-          {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
         <button className="w-9 h-9 rounded-lg bg-[#F3F4F6] dark:bg-white/10 flex items-center justify-center text-[#6B7280] dark:text-white/60 hover:text-[#1A2332] dark:hover:text-white transition-colors relative">
           <Bell className="w-4 h-4" />

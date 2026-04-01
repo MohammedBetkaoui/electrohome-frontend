@@ -18,6 +18,7 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 import { AdminLayout } from "./components/admin/AdminLayout";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { AdminProducts } from "./pages/admin/AdminProducts";
+import { AdminProductForm } from "./pages/admin/AdminProductForm";
 import { AdminOrders } from "./pages/admin/AdminOrders";
 import { AdminClients } from "./pages/admin/AdminClients";
 import { AdminReturns } from "./pages/admin/AdminReturns";
@@ -106,6 +107,8 @@ export const router = createBrowserRouter([
       { index: true, Component: AdminDashboard },
       { path: "analytics", Component: AdminAnalytics },
       { path: "produits", Component: AdminProducts },
+      { path: "produits/nouveau", Component: AdminProductForm },
+      { path: "produits/modifier/:id", Component: AdminProductForm },
       { path: "categories", Component: AdminCategories },
       { path: "commandes", Component: AdminOrders },
       { path: "retours", Component: AdminReturns },
