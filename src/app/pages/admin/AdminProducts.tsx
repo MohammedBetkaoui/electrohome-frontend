@@ -295,6 +295,13 @@ export function AdminProducts() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
+                            onClick={() => window.open(`/produit/${p.slug}`, '_blank')}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-[#3B82F6]/10 hover:text-[#3B82F6] transition-colors"
+                            title="Voir le produit"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => navigate(`/admin/produits/modifier/${p.id}`)}
                             className="w-8 h-8 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-[#FF6B35]/10 hover:text-[#FF6B35] transition-colors"
                             title="Modifier"
@@ -355,6 +362,9 @@ export function AdminProducts() {
                     {st.label}
                   </span>
                   <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => window.open(`/produit/${p.slug}`, '_blank')} className="w-7 h-7 rounded-lg bg-white/90 dark:bg-black/50 flex items-center justify-center text-[#6B7280] hover:text-[#3B82F6]" title="Voir le produit">
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
                     <button onClick={() => navigate(`/admin/produits/modifier/${p.id}`)} className="w-7 h-7 rounded-lg bg-white/90 dark:bg-black/50 flex items-center justify-center text-[#6B7280] hover:text-[#FF6B35]">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
