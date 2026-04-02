@@ -1,29 +1,15 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   Search, Eye, X, ChevronLeft, ChevronRight, ArrowUpDown,
-  RotateCcw, Clock, CheckCircle2, XCircle, Package, Truck,
-  AlertTriangle, Mail, Phone, MapPin, Download, Printer,
-  Camera, MessageSquare, RefreshCw, CreditCard
+  RotateCcw, Package, AlertTriangle, Mail, Phone, MapPin,
+  Download, Printer, Camera, MessageSquare, CreditCard, BarChart3
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getReturn,
   getReturns,
-  updateReturnStatus,
   type AdminReturn,
-  type ReturnStatus,
 } from "../../api/adminReturns";
-
-
-const STATUS_CONFIG: Record<ReturnStatus, { label: string; color: string; icon: any }> = {
-  pending: { label: "En attente", color: "#F59E0B", icon: Clock },
-  approved: { label: "Approuvé", color: "#3B82F6", icon: CheckCircle2 },
-  pickup: { label: "Ramassage", color: "#8B5CF6", icon: Truck },
-  received: { label: "Reçu", color: "#06B6D4", icon: Package },
-  inspecting: { label: "Inspection", color: "#F97316", icon: Search },
-  refunded: { label: "Remboursé", color: "#10B981", icon: CreditCard },
-  rejected: { label: "Rejeté", color: "#EF4444", icon: XCircle },
-};
 
 const REASON_LABELS: Record<string, string> = {
   defective: "Produit défectueux",
@@ -50,38 +36,10 @@ function formatDateTime(date: string) {
 function ReturnDetailModal({
   ret,
   onClose,
-  onStatusChange,
 }: {
   ret: AdminReturn;
   onClose: () => void;
-  onStatusChange: (id: number, status: ReturnStatus) => void;
 }) {
-  const st = STATUS_CONFIG[ret.status];
-  const StatusIcon = st.icon;
-
-  const NEXT_STATUS: Partial<Record<ReturnStatus, ReturnStatus[]>> = {
-    pending: ["approved", "rejected"],
-    approved: ["pickup"],
-    pickup: ["received"],
-    received: ["inspecting"],
-    inspecting: ["refunded", "rejected"],
-  };
-  const nextStatuses = NEXT_STATUS[ret.status] || [];
-
-  // Timeline
-  const TIMELINE_STEPS: { status: ReturnStatus; label: string }[] = [
-    { status: "pending", label: "Demande reçue" },
-    { status: "approved", label: "Approuvée" },
-    { status: "pickup", label: "Ramassage" },
-    { status: "received", label: "Produit reçu" },
-    { status: "inspecting", label: "Inspection" },
-    { status: "refunded", label: "Remboursé" },
-  ];
-
-  const statusOrder: ReturnStatus[] = ["pending", "approved", "pickup", "received", "inspecting", "refunded"];
-  const currentIdx = statusOrder.indexOf(ret.status);
-  const isRejected = ret.status === "rejected";
-
   return (
     <div className="fixed inset-0 bg-black/50 z-[100] flex items-start justify-center pt-6 overflow-y-auto" onClick={onClose}>
       <div
@@ -95,10 +53,6 @@ function ReturnDetailModal({
             <h2 className="text-[17px] text-[#1A2332] dark:text-white" style={{ fontWeight: 600 }}>
               Retour {ret.id}
             </h2>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px]" style={{ fontWeight: 500, backgroundColor: st.color + "15", color: st.color }}>
-              <StatusIcon className="w-3 h-3" />
-              {st.label}
-            </span>
           </div>
           <div className="flex items-center gap-2">
             <button className="w-8 h-8 rounded-lg bg-[#F3F4F6] dark:bg-white/10 flex items-center justify-center text-[#6B7280] hover:text-[#1A2332] dark:hover:text-white">
@@ -111,56 +65,6 @@ function ReturnDetailModal({
         </div>
 
         <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-          {/* Progress Timeline */}
-          {!isRejected && (
-            <div className="bg-[#F9FAFB] dark:bg-white/5 rounded-xl p-4">
-              <h4 className="text-[12px] text-[#9CA3AF] mb-4" style={{ fontWeight: 500 }}>Progression</h4>
-              <div className="flex items-center justify-between">
-                {TIMELINE_STEPS.map((step, i) => {
-                  const stepIdx = statusOrder.indexOf(step.status);
-                  const isCompleted = stepIdx <= currentIdx;
-                  const isCurrent = stepIdx === currentIdx;
-                  return (
-                    <div key={step.status} className="flex flex-col items-center flex-1 relative">
-                      {i > 0 && (
-                        <div
-                          className="absolute top-3 right-1/2 h-0.5 w-full -translate-x-0"
-                          style={{ backgroundColor: stepIdx <= currentIdx ? "#FF6B35" : "#E5E7EB" }}
-                        />
-                      )}
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center relative z-10 text-[10px] ${
-                          isCurrent ? "ring-4 ring-[#FF6B35]/20" : ""
-                        }`}
-                        style={{
-                          backgroundColor: isCompleted ? "#FF6B35" : "#E5E7EB",
-                          color: isCompleted ? "#fff" : "#9CA3AF",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {isCompleted ? "✓" : i + 1}
-                      </div>
-                      <span className={`text-[10px] mt-1.5 text-center ${isCurrent ? "text-[#FF6B35]" : "text-[#9CA3AF]"}`} style={{ fontWeight: isCurrent ? 600 : 400 }}>
-                        {step.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Rejected Banner */}
-          {isRejected && (
-            <div className="bg-[#FEE2E2] dark:bg-[#EF4444]/10 rounded-xl p-4 flex items-start gap-3">
-              <XCircle className="w-5 h-5 text-[#EF4444] shrink-0 mt-0.5" />
-              <div>
-                <p className="text-[13px] text-[#991B1B] dark:text-[#FCA5A5]" style={{ fontWeight: 600 }}>Demande de retour rejetée</p>
-                <p className="text-[12px] text-[#B91C1C] dark:text-[#FCA5A5]/80 mt-1">Ce retour a été rejeté et ne sera pas traité.</p>
-              </div>
-            </div>
-          )}
-
           {/* Info Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Client */}
@@ -269,27 +173,6 @@ function ReturnDetailModal({
             </div>
           )}
 
-          {/* Action Buttons */}
-          {nextStatuses.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-2">
-              <span className="text-[12px] text-[#9CA3AF] self-center mr-2">Changer le statut :</span>
-              {nextStatuses.map((ns) => {
-                const nsc = STATUS_CONFIG[ns];
-                const NsIcon = nsc.icon;
-                return (
-                  <button
-                    key={ns}
-                    onClick={() => onStatusChange(ret.returnId, ns)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] border transition-colors"
-                    style={{ fontWeight: 500, borderColor: nsc.color + "40", color: nsc.color, backgroundColor: nsc.color + "08" }}
-                  >
-                    <NsIcon className="w-3.5 h-3.5" />
-                    {nsc.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -302,7 +185,6 @@ export function AdminReturns() {
   const [isLoading, setIsLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [reasonFilter, setReasonFilter] = useState("all");
   const [sortField, setSortField] = useState<"createdAt" | "refundAmount">("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -349,7 +231,6 @@ export function AdminReturns() {
           || r.client.toLowerCase().includes(q);
       });
     }
-    if (statusFilter !== "all") list = list.filter((r) => r.status === statusFilter);
     if (reasonFilter !== "all") list = list.filter((r) => r.reason === reasonFilter);
     list.sort((a, b) => {
       const m = sortDir === "asc" ? 1 : -1;
@@ -357,7 +238,7 @@ export function AdminReturns() {
       return a.createdAt.localeCompare(b.createdAt) * m;
     });
     return list;
-  }, [returns, search, statusFilter, reasonFilter, sortField, sortDir]);
+  }, [returns, search, reasonFilter, sortField, sortDir]);
 
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
@@ -367,25 +248,15 @@ export function AdminReturns() {
     else { setSortField(field); setSortDir("desc"); }
   };
 
-  const handleStatusChange = async (returnId: number, newStatus: ReturnStatus) => {
-    try {
-      const updated = await updateReturnStatus(returnId, newStatus);
-      setReturns((prev) => prev.map((r) => r.returnId === returnId ? updated : r));
-      setDetailReturn((prev) => (prev && prev.returnId === returnId ? updated : prev));
-      toast.success("Statut mis a jour.");
-    } catch {
-      toast.error("Erreur lors de la mise a jour du statut.");
-    }
-  };
-
-  const statusCounts = useMemo(() => {
-    const c: Record<string, number> = {};
-    returns.forEach((r) => { c[r.status] = (c[r.status] || 0) + 1; });
-    return c;
-  }, [returns]);
-
-  const pendingRefundTotal = returns.filter((r) => !["refunded", "rejected"].includes(r.status)).reduce((s, r) => s + r.refundAmount, 0);
-  const refundedTotal = returns.filter((r) => r.status === "refunded").reduce((s, r) => s + r.refundAmount, 0);
+  const totalRefundAmount = useMemo(
+    () => returns.reduce((sum, ret) => sum + ret.refundAmount, 0),
+    [returns]
+  );
+  const averageRefundAmount = returns.length > 0 ? totalRefundAmount / returns.length : 0;
+  const returnedItemsTotal = useMemo(
+    () => returns.reduce((sum, ret) => sum + ret.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0),
+    [returns]
+  );
 
   if (isLoading) {
     return (
@@ -398,13 +269,12 @@ export function AdminReturns() {
   return (
     <div className="space-y-5" style={{ fontFamily: "'Sora', sans-serif" }}>
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: "Total retours", value: returns.length, icon: RotateCcw, color: "#3B82F6" },
-          { label: "En attente", value: statusCounts.pending || 0, icon: Clock, color: "#F59E0B" },
-          { label: "En traitement", value: (statusCounts.approved || 0) + (statusCounts.pickup || 0) + (statusCounts.received || 0) + (statusCounts.inspecting || 0), icon: RefreshCw, color: "#8B5CF6" },
-          { label: "Remboursés", value: formatPrice(refundedTotal), icon: CreditCard, color: "#10B981", isPrice: true },
-          { label: "Remb. en attente", value: formatPrice(pendingRefundTotal), icon: AlertTriangle, color: "#EF4444", isPrice: true },
+          { label: "Articles retours", value: returnedItemsTotal, icon: Package, color: "#F59E0B" },
+          { label: "Montant total", value: formatPrice(totalRefundAmount), icon: CreditCard, color: "#10B981", isPrice: true },
+          { label: "Montant moyen", value: formatPrice(averageRefundAmount), icon: BarChart3, color: "#8B5CF6", isPrice: true },
         ].map((s) => (
           <div key={s.label} className="bg-white dark:bg-[#1E1E24] rounded-xl p-4 border border-[#E5E7EB] dark:border-white/10 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: s.color + "15" }}>
@@ -415,29 +285,6 @@ export function AdminReturns() {
               <p className={`text-[#1A2332] dark:text-white truncate ${"isPrice" in s ? "text-[13px]" : "text-[18px]"}`} style={{ fontWeight: 700 }}>{s.value}</p>
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Status Quick Filters */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          { key: "all", label: "Tous", count: returns.length },
-          ...Object.entries(STATUS_CONFIG).map(([key, cfg]) => ({
-            key, label: cfg.label, count: statusCounts[key] || 0,
-          })),
-        ].map((f) => (
-          <button
-            key={f.key}
-            onClick={() => { setStatusFilter(f.key); setPage(1); }}
-            className={`px-3 py-1.5 rounded-lg text-[12px] border transition-colors ${
-              statusFilter === f.key
-                ? "bg-[#FF6B35] text-white border-[#FF6B35]"
-                : "border-[#E5E7EB] dark:border-white/10 text-[#6B7280] dark:text-white/50 hover:border-[#FF6B35]/50"
-            }`}
-            style={{ fontWeight: 500 }}
-          >
-            {f.label} ({f.count})
-          </button>
         ))}
       </div>
 
@@ -474,7 +321,6 @@ export function AdminReturns() {
                 <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9CA3AF] cursor-pointer select-none" style={{ fontWeight: 500 }} onClick={() => toggleSort("refundAmount")}>
                   <span className="inline-flex items-center gap-1">Montant <ArrowUpDown className="w-3 h-3" /></span>
                 </th>
-                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9CA3AF]" style={{ fontWeight: 500 }}>Statut</th>
                 <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9CA3AF] cursor-pointer select-none" style={{ fontWeight: 500 }} onClick={() => toggleSort("createdAt")}>
                   <span className="inline-flex items-center gap-1">Date <ArrowUpDown className="w-3 h-3" /></span>
                 </th>
@@ -483,8 +329,6 @@ export function AdminReturns() {
             </thead>
             <tbody>
               {paginated.map((r) => {
-                const st = STATUS_CONFIG[r.status];
-                const StIcon = st.icon;
                 return (
                   <tr key={r.id} className="border-b border-[#E5E7EB]/50 dark:border-white/5 hover:bg-[#F9FAFB] dark:hover:bg-white/5 transition-colors">
                     <td className="px-4 py-3">
@@ -516,12 +360,6 @@ export function AdminReturns() {
                     </td>
                     <td className="px-4 py-3 text-[#1A2332] dark:text-white" style={{ fontWeight: 600 }}>
                       {r.refundAmount > 0 ? formatPrice(r.refundAmount) : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px]" style={{ fontWeight: 500, backgroundColor: st.color + "15", color: st.color }}>
-                        <StIcon className="w-3 h-3" />
-                        {st.label}
-                      </span>
                     </td>
                     <td className="px-4 py-3 text-[12px] text-[#9CA3AF]">{formatDate(r.createdAt)}</td>
                     <td className="px-4 py-3">
@@ -566,7 +404,6 @@ export function AdminReturns() {
         <ReturnDetailModal
           ret={detailReturn}
           onClose={() => setDetailReturn(null)}
-          onStatusChange={handleStatusChange}
         />
       )}
     </div>
