@@ -3,7 +3,7 @@ import {
   Search, Eye, X, ChevronLeft, ChevronRight, ArrowUpDown,
   Users, UserCheck, UserX, ShieldAlert, Mail, Phone, MapPin,
   Calendar, ShoppingCart, Ban, CheckCircle2,
-  Download, TrendingUp, CreditCard, Package, RefreshCw,
+  Download, TrendingUp, CreditCard, Package, RefreshCw, RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -15,6 +15,7 @@ import {
   type AdminClient,
   type AdminClientDetail,
   type AdminClientOrder,
+  type AdminClientReturn,
   type ClientStatus,
 } from "../../api/adminClients";
 
@@ -70,7 +71,7 @@ function ClientDetailModal({
   onStatusChange: (id: number, status: ClientStatus, note?: string) => Promise<void>;
 }) {
   const st = STATUS_CONFIG[client.status];
-  const [tab, setTab] = useState<"overview" | "orders">("overview");
+  const [tab, setTab] = useState<"overview" | "orders" | "returns">("overview");
   const [isUpdating, setIsUpdating] = useState(false);
 
   const runStatusChange = async (status: ClientStatus) => {
@@ -115,7 +116,7 @@ function ClientDetailModal({
         </div>
 
         <div className="flex border-b border-[#E5E7EB] dark:border-white/10 px-6">
-          {(["overview", "orders"] as const).map((t) => (
+          {(["overview", "orders", "returns"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -126,7 +127,11 @@ function ClientDetailModal({
               }`}
               style={{ fontWeight: 500 }}
             >
-              {t === "overview" ? "Apercu" : `Commandes (${client.orders.length})`}
+              {t === "overview"
+                ? "Apercu"
+                : t === "orders"
+                  ? `Commandes (${client.orders.length})`
+                  : `Retours (${client.totalReturns})`}
             </button>
           ))}
         </div>
@@ -134,10 +139,11 @@ function ClientDetailModal({
         <div className="p-6 max-h-[65vh] overflow-y-auto">
           {tab === "overview" ? (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 {[
                   { label: "Total depense", value: formatPrice(client.totalSpent), icon: CreditCard, color: "#FF6B35" },
                   { label: "Commandes", value: client.totalOrders, icon: ShoppingCart, color: "#3B82F6" },
+                  { label: "Retours", value: client.totalReturns, icon: RotateCcw, color: "#F97316" },
                   { label: "Panier moyen", value: formatPrice(client.averageOrder), icon: TrendingUp, color: "#10B981" },
                   { label: "Categorie favorite", value: client.favoriteCategory, icon: Package, color: "#8B5CF6", small: true },
                 ].map((kpi) => (
@@ -179,10 +185,12 @@ function ClientDetailModal({
                 </div>
                 <div className="bg-[#F9FAFB] dark:bg-white/5 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-1">
-                    <ShoppingCart className="w-3.5 h-3.5 text-[#9CA3AF]" />
-                    <span className="text-[11px] text-[#9CA3AF]">Derniere commande</span>
+                    <RotateCcw className="w-3.5 h-3.5 text-[#9CA3AF]" />
+                    <span className="text-[11px] text-[#9CA3AF]">Produits retournes</span>
                   </div>
-                  <p className="text-[13px] text-[#1A2332] dark:text-white" style={{ fontWeight: 500 }}>{formatDate(client.lastOrderAt)}</p>
+                  <p className="text-[13px] text-[#1A2332] dark:text-white" style={{ fontWeight: 500 }}>
+                    {client.returnedProducts.length > 0 ? client.returnedProducts.join(", ") : "Aucun retour produit"}
+                  </p>
                 </div>
               </div>
 
@@ -226,7 +234,7 @@ function ClientDetailModal({
                 )}
               </div>
             </div>
-          ) : (
+          ) : tab === "orders" ? (
             <div className="space-y-2">
               {client.orders.length === 0 ? (
                 <p className="text-[13px] text-[#9CA3AF] text-center py-8">Aucune commande</p>
@@ -251,6 +259,37 @@ function ClientDetailModal({
                         {order.status}
                       </span>
                     </div>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {client.returns.length === 0 ? (
+                <p className="text-[13px] text-[#9CA3AF] text-center py-8">Aucun retour</p>
+              ) : (
+                client.returns.map((ret: AdminClientReturn) => (
+                  <div key={ret.id} className="flex items-center justify-between bg-[#F9FAFB] dark:bg-white/5 rounded-xl p-4 gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-lg bg-white dark:bg-white/10 flex items-center justify-center shrink-0">
+                        <RotateCcw className="w-4 h-4 text-[#9CA3AF]" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[13px] text-[#1A2332] dark:text-white" style={{ fontWeight: 600 }}>{ret.id}</p>
+                        <p className="text-[11px] text-[#9CA3AF] truncate">
+                          {formatDate(ret.date)} · {ret.items} article{ret.items > 1 ? "s" : ""}
+                        </p>
+                        <p className="text-[11px] text-[#6B7280] dark:text-white/60 truncate">
+                          {ret.products.length > 0 ? ret.products.join(", ") : "Produit non renseigne"}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className="inline-flex px-2 py-0.5 rounded-full text-[10px] mt-0.5 shrink-0"
+                      style={{ fontWeight: 500, backgroundColor: ret.statusColor + "15", color: ret.statusColor }}
+                    >
+                      {ret.status}
+                    </span>
                   </div>
                 ))
               )}
@@ -507,6 +546,7 @@ export function AdminClients() {
                 <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9CA3AF] cursor-pointer select-none" style={{ fontWeight: 500 }} onClick={() => toggleSort("totalSpent")}>
                   <span className="inline-flex items-center gap-1">Total depense <ArrowUpDown className="w-3 h-3" /></span>
                 </th>
+                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9CA3AF]" style={{ fontWeight: 500 }}>Retours</th>
                 <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9CA3AF]" style={{ fontWeight: 500 }}>Statut</th>
                 <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9CA3AF] cursor-pointer select-none" style={{ fontWeight: 500 }} onClick={() => toggleSort("lastOrderAt")}>
                   <span className="inline-flex items-center gap-1">Derniere cmd <ArrowUpDown className="w-3 h-3" /></span>
@@ -545,6 +585,12 @@ export function AdminClients() {
                     </td>
                     <td className="px-4 py-3 text-[#1A2332] dark:text-white" style={{ fontWeight: 600 }}>
                       {formatPrice(client.totalSpent)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-[12px] text-[#1A2332] dark:text-white" style={{ fontWeight: 600 }}>{client.totalReturns}</p>
+                      <p className="text-[11px] text-[#9CA3AF] max-w-[180px] truncate">
+                        {client.returnedProducts.length > 0 ? client.returnedProducts.join(", ") : "-"}
+                      </p>
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -607,7 +653,7 @@ export function AdminClients() {
 
               {visibleClients.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-[13px] text-[#9CA3AF]">
+                  <td colSpan={8} className="px-4 py-10 text-center text-[13px] text-[#9CA3AF]">
                     Aucun client trouve.
                   </td>
                 </tr>

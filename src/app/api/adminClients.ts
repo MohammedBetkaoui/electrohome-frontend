@@ -13,6 +13,15 @@ export interface AdminClientOrder {
   items: number;
 }
 
+export interface AdminClientReturn {
+  id: string;
+  date: string | null;
+  status: string;
+  statusColor: string;
+  items: number;
+  products: string[];
+}
+
 export interface AdminClient {
   userId: number;
   id: string;
@@ -26,6 +35,8 @@ export interface AdminClient {
   createdAt: string | null;
   lastOrderAt: string | null;
   totalOrders: number;
+  totalReturns: number;
+  returnedProducts: string[];
   totalSpent: number;
   averageOrder: number;
 }
@@ -34,6 +45,7 @@ export interface AdminClientDetail extends AdminClient {
   favoriteCategory: string;
   notes?: string | null;
   orders: AdminClientOrder[];
+  returns: AdminClientReturn[];
 }
 
 export interface AdminClientStats {
