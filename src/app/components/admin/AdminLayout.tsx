@@ -50,7 +50,6 @@ const TITLES: Record<string, string> = {
   "/admin/retours": "Gestion des Retours",
   "/admin/clients": "Gestion des Clients",
   "/admin/factures": "Factures",
-  "/admin/livraisons": "Suivi des Livraisons",
   "/admin/inventaire": "Inventaire & Stock",
   "/admin/fournisseurs": "Fournisseurs",
   "/admin/marketing": "Marketing",
@@ -59,10 +58,7 @@ const TITLES: Record<string, string> = {
   "/admin/blog": "Blog",
   "/admin/support": "Support",
   "/admin/notifications": "Centre de Notifications",
-  "/admin/roles": "Rôles & Permissions",
   "/admin/rapports": "Rapports",
-  "/admin/logs": "Journal d'Activité",
-  "/admin/import-export": "Import / Export",
   "/admin/parametres": "Paramètres",
 };
 

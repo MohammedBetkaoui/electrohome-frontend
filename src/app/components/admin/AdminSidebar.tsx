@@ -2,8 +2,8 @@ import { NavLink } from "react-router";
 import {
   LayoutDashboard, Package, ShoppingCart, RotateCcw, Users, Megaphone,
   FileText, Headphones, Settings, ChevronLeft, ChevronRight, LogOut, Zap, X,
-  BarChart3, Receipt, Boxes, Star, Truck, Grid3X3, ClipboardList,
-  Shield, ScrollText, Building2, ArrowLeftRight, Bell, Flame
+  BarChart3, Receipt, Boxes, Star, Grid3X3, ClipboardList,
+  Building2, Bell, Flame
 } from "lucide-react";
 import { useSidebar } from "./AdminLayout";
 
@@ -24,7 +24,6 @@ const NAV_SECTIONS = [
     items: [
       { to: "/admin/clients", icon: Users, label: "Clients" },
       { to: "/admin/factures", icon: Receipt, label: "Factures" },
-      { to: "/admin/livraisons", icon: Truck, label: "Livraisons" },
       { to: "/admin/inventaire", icon: Boxes, label: "Inventaire" },
       { to: "/admin/fournisseurs", icon: Building2, label: "Fournisseurs" },
     ],
@@ -43,10 +42,7 @@ const NAV_SECTIONS = [
     items: [
       { to: "/admin/support", icon: Headphones, label: "Support" },
       { to: "/admin/notifications", icon: Bell, label: "Notifications" },
-      { to: "/admin/roles", icon: Shield, label: "Rôles" },
       { to: "/admin/rapports", icon: ClipboardList, label: "Rapports" },
-      { to: "/admin/logs", icon: ScrollText, label: "Journal" },
-      { to: "/admin/import-export", icon: ArrowLeftRight, label: "Import/Export" },
       { to: "/admin/parametres", icon: Settings, label: "Paramètres" },
     ],
   },
