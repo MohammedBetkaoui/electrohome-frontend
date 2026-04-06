@@ -1,6 +1,6 @@
 import { NavLink } from "react-router";
 import {
-  LayoutDashboard, Package, ShoppingCart, RotateCcw, Users, Megaphone,
+  LayoutDashboard, Package, ShoppingCart, RotateCcw, Users,
   FileText, Headphones, Settings, ChevronLeft, ChevronRight, LogOut, Zap, X,
   BarChart3, Receipt, Boxes, Star, Grid3X3, ClipboardList,
   Building2, Bell, Flame
@@ -31,7 +31,6 @@ const NAV_SECTIONS = [
   {
     label: "Marketing",
     items: [
-      { to: "/admin/marketing", icon: Megaphone, label: "Campagnes" },
       { to: "/admin/promotions", icon: Flame, label: "Promotions" },
       { to: "/admin/avis", icon: Star, label: "Avis clients" },
       { to: "/admin/blog", icon: FileText, label: "Blog" },
