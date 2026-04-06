@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
-  X, Printer, CheckCircle2, Clock, Package,
+  Printer, CheckCircle2, Clock, Package,
   RotateCcw, Truck, XCircle, Mail, MapPin, Phone,
   ChevronLeft
 } from "lucide-react";
@@ -30,7 +30,11 @@ const STATUS_CONFIG: Record<
 };
 
 function formatPrice(price: number) {
-  return price.toLocaleString("fr-DZ") + " DA";
+  const amount = Number.isFinite(price) ? price : 0;
+  const normalized = new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(amount);
+  return normalized.replace(/,/g, " ") + " DA";
 }
 function formatShortDate(date: string) {
   return new Date(date).toLocaleDateString("fr-DZ", {
@@ -54,187 +58,213 @@ function formatPaymentMethod(method: string) {
   return method;
 }
 
-function exportOrderPdf(order: AdminOrderDetail) {
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
+async function exportOrderPdf(order: AdminOrderDetail) {
+  const doc = new jsPDF();
   const pdfDoc = doc as jsPDF & { lastAutoTable?: { finalY: number } };
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 14;
-  const blockGap = 6;
-  const contentWidth = pageWidth - margin * 2;
-  const blockWidth = (contentWidth - blockGap) / 2;
+  const logoSrc = `${window.location.origin}/logo.png`;
 
-  doc.setFillColor(26, 35, 50);
-  doc.rect(0, 0, pageWidth, 34, "F");
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = logoSrc;
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text("ELECTROHOME", margin, 13);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text("Facture de commande", margin, 20);
-  doc.text("Document commercial officiel", margin, 25);
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text("FACTURE", pageWidth - margin, 13, { align: "right" });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(`No ${order.order_number}`, pageWidth - margin, 20, { align: "right" });
-  doc.text(`Genere le ${formatDateTime(new Date().toISOString())}`, pageWidth - margin, 25, {
-    align: "right",
+  await new Promise<void>((resolve) => {
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
   });
 
-  const cardTop = 42;
-  const cardHeight = 44;
+  const customerName = order.address?.full_name || order.client;
+  const customerPhone = order.address?.phone || order.phone || "Non renseigne";
+  const customerAddress = order.address
+    ? `${order.address.address}, ${order.address.city}`
+    : "Adresse non renseignee";
+  const deliveryEstimate = order.estimated_delivery
+    ? formatShortDate(order.estimated_delivery)
+    : "Non renseignee";
+  const statusLabel = STATUS_CONFIG[order.status]?.label ?? order.status;
 
-  doc.setTextColor(26, 35, 50);
-  doc.setDrawColor(229, 231, 235);
-  doc.setFillColor(255, 255, 255);
-  doc.roundedRect(margin, cardTop, blockWidth, cardHeight, 2, 2, "FD");
-  doc.roundedRect(margin + blockWidth + blockGap, cardTop, blockWidth, cardHeight, 2, 2, "FD");
+  doc.setFillColor(30, 30, 40);
+  doc.rect(0, 0, pageWidth, 50, "F");
 
-  doc.setFont("helvetica", "bold");
+  try {
+    doc.addImage(img, "PNG", 14, 8, 32, 32);
+  } catch {
+    doc.setTextColor(200, 180, 140);
+    doc.setFontSize(18);
+    doc.text("ElectroHome", 14, 28);
+  }
+
+  doc.setTextColor(200, 180, 140);
+  doc.setFontSize(20);
+  doc.text("FACTURE", pageWidth - 14, 22, { align: "right" });
   doc.setFontSize(10);
-  doc.text("Client", margin + 4, cardTop + 7);
-  doc.text("Details commande", margin + blockWidth + blockGap + 4, cardTop + 7);
+  doc.setTextColor(180, 180, 190);
+  doc.text(`N° ${order.order_number}`, pageWidth - 14, 30, { align: "right" });
+  doc.text(`Date: ${formatDateTime(order.created_at)}`, pageWidth - 14, 37, { align: "right" });
 
-  doc.setFont("helvetica", "normal");
+  doc.setDrawColor(200, 180, 140);
+  doc.setLineWidth(1.5);
+  doc.line(14, 52, pageWidth - 14, 52);
+
+  let y = 62;
+
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 110);
+  doc.text("Emetteur:", margin, y);
+  doc.setTextColor(40, 40, 50);
+  doc.setFontSize(11);
+  doc.text("ElectroHome", margin, y + 7);
   doc.setFontSize(9);
+  doc.setTextColor(100, 100, 110);
+  doc.text("Bourdj bou arreridj, Algerie", margin, y + 13);
+  doc.text("contact@electrohome.dz", margin, y + 19);
+  doc.text("Tel: +213 555 000 000", margin, y + 25);
 
-  const customerLines = [
-    order.address?.full_name || order.client,
-    order.email || "Email non renseigne",
-    order.address?.phone || order.phone || "Telephone non renseigne",
-    order.address
-      ? `${order.address.address}, ${order.address.city}`
-      : "Adresse non renseignee",
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 110);
+  doc.text("Facturer a:", pageWidth / 2 + 10, y);
+  doc.setTextColor(40, 40, 50);
+  doc.setFontSize(11);
+  doc.text(customerName, pageWidth / 2 + 10, y + 7);
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 110);
+  doc.text(customerAddress, pageWidth / 2 + 10, y + 13, { maxWidth: 80 });
+  doc.text(order.email || "Email non renseigne", pageWidth / 2 + 10, y + 19);
+  doc.text(`Tel: ${customerPhone}`, pageWidth / 2 + 10, y + 25);
+
+  y += 38;
+
+  const boxW = (pageWidth - 28 - 15) / 4;
+  const boxes = [
+    { label: "Commande", value: order.order_number },
+    { label: "Statut", value: statusLabel },
+    { label: "Paiement", value: formatPaymentMethod(order.payment_method) },
+    { label: "Livraison", value: order.delivery_method?.label || "Non specifiee" },
   ];
 
-  customerLines.forEach((line, index) => {
-    doc.text(String(line), margin + 4, cardTop + 14 + index * 7);
+  boxes.forEach((box, index) => {
+    const bx = margin + index * (boxW + 5);
+    doc.setFillColor(245, 245, 248);
+    doc.roundedRect(bx, y, boxW, 22, 3, 3, "F");
+    doc.setFontSize(7);
+    doc.setTextColor(140, 140, 150);
+    doc.text(box.label.toUpperCase(), bx + 5, y + 8);
+    doc.setFontSize(9);
+    doc.setTextColor(40, 40, 50);
+    doc.text(box.value, bx + 5, y + 16, { maxWidth: boxW - 10 });
   });
 
-  const orderLines = [
-    `Date: ${formatDateTime(order.created_at)}`,
-    `Statut: ${STATUS_CONFIG[order.status].label}`,
-    `Paiement: ${formatPaymentMethod(order.payment_method)}`,
-    `Livraison: ${order.delivery_method?.label || "Non specifiee"}`,
-  ];
-
-  orderLines.forEach((line, index) => {
-    doc.text(line, margin + blockWidth + blockGap + 4, cardTop + 14 + index * 7);
-  });
-
-  const tableStartY = cardTop + cardHeight + 8;
+  y += 32;
 
   autoTable(doc, {
-    startY: tableStartY,
-    margin: { left: margin, right: margin },
-    head: [["Article", "Marque", "Qte", "Prix unit.", "Montant"]],
+    startY: y,
+    head: [["Article", "Marque", "Qte", "Prix unitaire", "Total"]],
     body: order.items.map((item) => [
       item.product_name,
       item.product_brand,
-      String(item.quantity),
+      item.quantity.toString(),
       formatPrice(item.unit_price),
       formatPrice(item.subtotal),
     ]),
+    theme: "plain",
     headStyles: {
-      fillColor: [26, 35, 50],
-      textColor: [255, 255, 255],
+      fillColor: [30, 30, 40],
+      textColor: [200, 180, 140],
       fontStyle: "bold",
       fontSize: 9,
+      cellPadding: 6,
     },
-    styles: {
+    bodyStyles: {
       fontSize: 9,
-      textColor: [26, 35, 50],
-      lineColor: [229, 231, 235],
-      lineWidth: 0.2,
-      cellPadding: 2.5,
+      cellPadding: 6,
+      textColor: [50, 50, 60],
+    },
+    alternateRowStyles: {
+      fillColor: [250, 250, 252],
     },
     columnStyles: {
-      2: { halign: "center", cellWidth: 18 },
-      3: { halign: "right", cellWidth: 34 },
-      4: { halign: "right", cellWidth: 34 },
+      0: { cellWidth: 65 },
+      2: { halign: "center" },
+      3: { halign: "right" },
+      4: { halign: "right" },
     },
-    theme: "grid",
+    margin: { left: margin, right: margin },
   });
 
-  let summaryTop = (pdfDoc.lastAutoTable?.finalY || tableStartY + 24) + 8;
-  if (summaryTop > pageHeight - 62) {
-    doc.addPage();
-    summaryTop = margin;
-  }
+  y = (pdfDoc.lastAutoTable?.finalY || y) + 10;
 
-  const summaryWidth = 78;
-  const summaryX = pageWidth - margin - summaryWidth;
+  const totalsX = pageWidth - 90;
+  doc.setDrawColor(230, 230, 235);
+  doc.setLineWidth(0.3);
+  doc.line(totalsX, y, pageWidth - margin, y);
 
-  doc.setDrawColor(229, 231, 235);
-  doc.roundedRect(summaryX, summaryTop, summaryWidth, 40, 2, 2, "S");
-  doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
+  doc.setTextColor(100, 100, 110);
+  doc.text("Sous-total", totalsX, y + 8);
+  doc.text(formatPrice(order.subtotal), pageWidth - margin, y + 8, { align: "right" });
 
-  const summaryRows = [
-    { label: "Sous-total", value: formatPrice(order.subtotal) },
-    {
-      label: "Livraison",
-      value: order.delivery_cost === 0 ? "Gratuite" : formatPrice(order.delivery_cost),
-    },
-  ];
+  doc.text("Frais de livraison", totalsX, y + 16);
+  doc.text(
+    order.delivery_cost === 0 ? "Gratuite" : formatPrice(order.delivery_cost),
+    pageWidth - margin,
+    y + 16,
+    { align: "right" },
+  );
 
   if (order.discount_amount > 0) {
-    summaryRows.push({ label: "Remise", value: `- ${formatPrice(order.discount_amount)}` });
+    doc.text("Remise", totalsX, y + 24);
+    doc.text(`- ${formatPrice(order.discount_amount)}`, pageWidth - margin, y + 24, {
+      align: "right",
+    });
+    doc.line(totalsX, y + 29, pageWidth - margin, y + 29);
+  } else {
+    doc.line(totalsX, y + 21, pageWidth - margin, y + 21);
   }
 
-  summaryRows.forEach((row, index) => {
-    const rowY = summaryTop + 8 + index * 6;
-    doc.setTextColor(107, 114, 128);
-    doc.text(row.label, summaryX + 4, rowY);
-    doc.setTextColor(26, 35, 50);
-    doc.text(row.value, summaryX + summaryWidth - 4, rowY, { align: "right" });
-  });
+  const totalBoxY = order.discount_amount > 0 ? y + 32 : y + 24;
+  doc.setFillColor(30, 30, 40);
+  doc.roundedRect(totalsX - 4, totalBoxY, pageWidth - totalsX - margin, 16, 3, 3, "F");
+  doc.setFontSize(11);
+  doc.setTextColor(255, 255, 255);
+  doc.text("Total TTC", totalsX + 2, totalBoxY + 10);
+  doc.setTextColor(200, 180, 140);
+  doc.text(formatPrice(order.total_ttc), pageWidth - 18, totalBoxY + 10, { align: "right" });
 
-  const totalY = summaryTop + 33;
-  doc.setDrawColor(229, 231, 235);
-  doc.line(summaryX + 4, totalY - 5, summaryX + summaryWidth - 4, totalY - 5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(26, 35, 50);
-  doc.text("Total TTC", summaryX + 4, totalY);
-  doc.setTextColor(255, 107, 53);
-  doc.text(formatPrice(order.total_ttc), summaryX + summaryWidth - 4, totalY, { align: "right" });
+  y = totalBoxY + 26;
 
-  let noteTop = summaryTop + 48;
-  if (noteTop > pageHeight - 44) {
-    doc.addPage();
-    noteTop = margin;
-  }
+  doc.setFontSize(8);
+  doc.setTextColor(140, 140, 150);
+  doc.text(`Livraison estimee: ${deliveryEstimate}`, margin, y);
 
   if (order.notes) {
-    doc.setTextColor(26, 35, 50);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("Note interne", margin, noteTop);
-
-    doc.setFont("helvetica", "normal");
+    y += 8;
+    if (y > pageHeight - 42) {
+      doc.addPage();
+      y = margin;
+    }
     doc.setFontSize(9);
-    const noteLines = doc.splitTextToSize(order.notes, contentWidth);
-    doc.text(noteLines, margin, noteTop + 6);
-    noteTop += noteLines.length * 4.5 + 6;
+    doc.setTextColor(40, 40, 50);
+    doc.text("Note interne:", margin, y);
+    doc.setTextColor(100, 100, 110);
+    const noteLines = doc.splitTextToSize(order.notes, pageWidth - margin * 2);
+    doc.text(noteLines, margin, y + 5);
   }
 
-  const pageCount = doc.getNumberOfPages();
-  for (let page = 1; page <= pageCount; page += 1) {
-    doc.setPage(page);
-    doc.setDrawColor(229, 231, 235);
-    doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
-
-    doc.setTextColor(107, 114, 128);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text("Document genere automatiquement depuis l'espace administrateur ElectroHome.", margin, pageHeight - 7);
-    doc.text(`Page ${page}/${pageCount}`, pageWidth - margin, pageHeight - 7, { align: "right" });
-  }
+  const footerY = pageHeight - 20;
+  doc.setDrawColor(200, 180, 140);
+  doc.setLineWidth(0.5);
+  doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 160);
+  doc.text("ElectroHome - Votre specialiste en electromenager", pageWidth / 2, footerY, {
+    align: "center",
+  });
+  doc.text("www.electrohome.dz | contact@electrohome.dz | +213 555 000 000", pageWidth / 2, footerY + 6, {
+    align: "center",
+  });
+  doc.text("Merci pour votre confiance !", pageWidth / 2, footerY + 12, { align: "center" });
 
   doc.save(`facture-${order.order_number}.pdf`);
 }
@@ -249,6 +279,7 @@ export function AdminOrderDetail() {
   const [isChanging, setIsChanging] = useState(false);
   const [localNotes, setLocalNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   useEffect(() => {
     async function loadDetail() {
@@ -309,12 +340,15 @@ export function AdminOrderDetail() {
     }
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true);
     try {
-      exportOrderPdf(order);
+      await exportOrderPdf(order);
       toast.success("PDF genere avec succes.");
     } catch {
       toast.error("Impossible de generer le PDF.");
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -351,10 +385,11 @@ export function AdminOrderDetail() {
         <div className="flex items-center gap-3">
           <button
             onClick={handleExportPdf}
+            disabled={isExportingPdf}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-[#1E1E24] border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#6B7280] hover:text-[#1A2332] dark:hover:text-white transition-colors"
             style={{ fontWeight: 500 }}
           >
-            <Printer className="w-4 h-4" /> Facture PDF
+            <Printer className="w-4 h-4" /> {isExportingPdf ? "Generation..." : "Facture PDF"}
           </button>
         </div>
       </div>

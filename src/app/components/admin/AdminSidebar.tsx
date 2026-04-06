@@ -2,7 +2,7 @@ import { NavLink } from "react-router";
 import {
   LayoutDashboard, Package, ShoppingCart, RotateCcw, Users,
   FileText, Headphones, Settings, ChevronLeft, ChevronRight, LogOut, Zap, X,
-  BarChart3, Receipt, Boxes, Star, Grid3X3, ClipboardList,
+  BarChart3, Boxes, Star, Grid3X3, ClipboardList,
   Building2, Bell, Flame
 } from "lucide-react";
 import { useSidebar } from "./AdminLayout";
@@ -23,7 +23,6 @@ const NAV_SECTIONS = [
     label: "Commerce",
     items: [
       { to: "/admin/clients", icon: Users, label: "Clients" },
-      { to: "/admin/factures", icon: Receipt, label: "Factures" },
       { to: "/admin/inventaire", icon: Boxes, label: "Inventaire" },
       { to: "/admin/fournisseurs", icon: Building2, label: "Fournisseurs" },
     ],

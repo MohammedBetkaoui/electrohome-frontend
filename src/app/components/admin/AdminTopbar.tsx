@@ -5,6 +5,7 @@ import { useSidebar } from "./AdminLayout";
 import { useStore } from "../../data/store";
 import { getAdminNotifications, type AdminNotification } from "../../api/adminNotifications";
 import { getEchoClient } from "../../lib/echo";
+import { ensureAdminNotificationAudioUnlock, playAdminNotificationSound } from "../../lib/adminNotificationAudio";
 
 export function AdminTopbar({ title }: { title: string }) {
   const { darkMode, toggleDarkMode } = useStore();
@@ -14,18 +15,31 @@ export function AdminTopbar({ title }: { title: string }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const channelBoundRef = useRef(false);
   const notifMenuRef = useRef<HTMLDivElement | null>(null);
+  const hasLoadedOnceRef = useRef(false);
+  const knownNotificationIdsRef = useRef<Set<number>>(new Set());
 
   const refreshUnreadCount = async () => {
     try {
       const res = await getAdminNotifications({ limit: 12 });
+      const hasNewSinceLastRefresh = hasLoadedOnceRef.current
+        ? res.data.some((item) => !knownNotificationIdsRef.current.has(item.id))
+        : false;
+
       setUnreadCount(res.meta.unreadCount ?? 0);
       setUnreadPreview(res.data.filter((n) => !n.read).slice(0, 5));
+      knownNotificationIdsRef.current = new Set(res.data.map((item) => item.id));
+      hasLoadedOnceRef.current = true;
+
+      if (hasNewSinceLastRefresh) {
+        playAdminNotificationSound();
+      }
     } catch {
       // Keep topbar quiet if API is temporarily unavailable.
     }
   };
 
   useEffect(() => {
+    ensureAdminNotificationAudioUnlock();
     void refreshUnreadCount();
 
     const intervalId = window.setInterval(() => {
@@ -54,11 +68,15 @@ export function AdminTopbar({ title }: { title: string }) {
 
     const channel = echo.private("admin.notifications");
     channel.listen(".admin.notification.created", (_event: AdminNotification) => {
+      if (knownNotificationIdsRef.current.has(_event.id)) return;
+
+      knownNotificationIdsRef.current.add(_event.id);
       setUnreadCount((prev) => prev + 1);
       setUnreadPreview((prev) => [
         { ..._event, read: false },
         ...prev.filter((n) => n.id !== _event.id),
       ].slice(0, 5));
+      playAdminNotificationSound();
     });
 
     channelBoundRef.current = true;

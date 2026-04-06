@@ -49,7 +49,6 @@ const TITLES: Record<string, string> = {
   "/admin/commandes": "Gestion des Commandes",
   "/admin/retours": "Gestion des Retours",
   "/admin/clients": "Gestion des Clients",
-  "/admin/factures": "Factures",
   "/admin/inventaire": "Inventaire & Stock",
   "/admin/fournisseurs": "Fournisseurs",
   "/admin/promotions": "Promotions",

@@ -1,18 +1,46 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { ShoppingCart, Heart, User, Sun, Moon, Search, Menu, X, Home, Grid3X3, Package, Shield, LogOut } from "lucide-react";
+import { ShoppingCart, Heart, User, Sun, Moon, Search, Menu, X, Home, Grid3X3, Package, Shield, LogOut, Bell } from "lucide-react";
 import { useStore } from "../data/store";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
+import { getAdminNotifications, type AdminNotification } from "../api/adminNotifications";
+import { getEchoClient } from "../lib/echo";
+import { ensureAdminNotificationAudioUnlock, playAdminNotificationSound } from "../lib/adminNotificationAudio";
 
 
 export function Header() {
   const { cart, darkMode, toggleDarkMode, searchQuery, setSearchQuery } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [adminUnreadCount, setAdminUnreadCount] = useState(0);
   const navigate = useNavigate();
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
   const { user, isAuthenticated, logout } = useAuth();
+  const channelBoundRef = useRef(false);
+  const hasLoadedAdminNotificationsRef = useRef(false);
+  const knownAdminNotificationIdsRef = useRef<Set<number>>(new Set());
+
+  const refreshAdminNotifications = async () => {
+    if (!user?.is_admin) return;
+
+    try {
+      const res = await getAdminNotifications({ limit: 12 });
+      const hasNewSinceLastRefresh = hasLoadedAdminNotificationsRef.current
+        ? res.data.some((item) => !knownAdminNotificationIdsRef.current.has(item.id))
+        : false;
+
+      setAdminUnreadCount(res.meta.unreadCount ?? 0);
+      knownAdminNotificationIdsRef.current = new Set(res.data.map((item) => item.id));
+      hasLoadedAdminNotificationsRef.current = true;
+
+      if (hasNewSinceLastRefresh) {
+        playAdminNotificationSound();
+      }
+    } catch {
+      // Keep store header quiet if notifications API is temporarily unavailable.
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -38,6 +66,58 @@ export function Header() {
     if (searchQuery.trim()) navigate(`/recherche?q=${encodeURIComponent(searchQuery)}`);
     setSearchOpen(false);
   };
+
+  useEffect(() => {
+    if (!user?.is_admin) {
+      setAdminUnreadCount(0);
+      channelBoundRef.current = false;
+      hasLoadedAdminNotificationsRef.current = false;
+      knownAdminNotificationIdsRef.current = new Set();
+      return;
+    }
+
+    ensureAdminNotificationAudioUnlock();
+    void refreshAdminNotifications();
+
+    const intervalId = window.setInterval(() => {
+      void refreshAdminNotifications();
+    }, 3000);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void refreshAdminNotifications();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisible);
+
+    const echo = getEchoClient();
+    let stopChannel = () => undefined;
+
+    if (echo && !channelBoundRef.current) {
+      const channel = echo.private("admin.notifications");
+      channel.listen(".admin.notification.created", (event: AdminNotification) => {
+        if (knownAdminNotificationIdsRef.current.has(event.id)) return;
+
+        knownAdminNotificationIdsRef.current.add(event.id);
+        setAdminUnreadCount((prev) => prev + 1);
+        playAdminNotificationSound();
+      });
+
+      channelBoundRef.current = true;
+      stopChannel = () => {
+        channel.stopListening(".admin.notification.created");
+        echo.leaveChannel("private-admin.notifications");
+        channelBoundRef.current = false;
+      };
+    }
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisible);
+      stopChannel();
+    };
+  }, [user?.is_admin]);
 
   return (
     <>
@@ -73,7 +153,7 @@ export function Header() {
               <button onClick={toggleDarkMode} className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-muted transition-colors">
                 {darkMode ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
               </button>
-              <Link to="/compte" className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-muted transition-colors hidden sm:flex">
+              <Link to="/compte" className="w-9 h-9 rounded-lg hidden sm:flex items-center justify-center hover:bg-muted transition-colors">
                 <Heart className="w-4.5 h-4.5" />
               </Link>
               <Link to="/panier" className="relative w-9 h-9 rounded-lg flex items-center justify-center hover:bg-muted transition-colors">
@@ -84,6 +164,20 @@ export function Header() {
                   </span>
                 )}
               </Link>
+              {user?.is_admin && (
+                <Link
+                  to="/admin/notifications"
+                  className="relative w-9 h-9 rounded-lg flex items-center justify-center hover:bg-muted transition-colors"
+                  title="Notifications admin"
+                >
+                  <Bell className="w-4.5 h-4.5" />
+                  {adminUnreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#E8400C] dark:bg-[#FF5722] text-white text-[9px] flex items-center justify-center" style={{ fontWeight: 600 }}>
+                      {adminUnreadCount > 99 ? "99+" : adminUnreadCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               {isAuthenticated ? (
                 <div className="hidden sm:flex items-center gap-2">
                   <Link
@@ -161,6 +255,11 @@ export function Header() {
                       🔧 Administration
                     </Link>
                   )}
+                  {user?.is_admin && (
+                    <Link to="/admin/notifications" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 rounded-lg text-sm text-[#FF6B35]">
+                      🔔 Notifications{adminUnreadCount > 0 ? ` (${adminUnreadCount > 99 ? "99+" : adminUnreadCount})` : ""}
+                    </Link>
+                  )}
                 </>
               ) : (
                 <Link to="/auth" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 rounded-lg text-sm text-[#E8400C]">
@@ -187,6 +286,19 @@ export function Header() {
               <span className="text-[10px]">{item.label}</span>
             </Link>
           ))}
+          {user?.is_admin && (
+            <Link to="/admin/notifications" className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors">
+              <div className="relative">
+                <Bell className="w-5 h-5" />
+                {adminUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-2 min-w-[14px] h-3.5 px-1 rounded-full bg-[#E8400C] dark:bg-[#FF5722] text-white text-[8px] flex items-center justify-center" style={{ fontWeight: 600 }}>
+                    {adminUnreadCount > 99 ? "99+" : adminUnreadCount}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px]">Notif</span>
+            </Link>
+          )}
         </div>
       </nav>
     </>

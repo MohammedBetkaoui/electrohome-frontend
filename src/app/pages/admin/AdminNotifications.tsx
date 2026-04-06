@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, ShoppingCart, Users, RefreshCw, Trash2 } from "lucide-react";
+import { ShoppingCart, Users, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getAdminNotifications,
@@ -37,19 +37,24 @@ export function AdminNotifications() {
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const channelBoundRef = useRef(false);
+  const knownNotificationIdsRef = useRef<Set<number>>(new Set());
 
   const mergeNotifications = (incoming: Notification[]) => {
     if (incoming.length === 0) return;
 
-    setNotifications((prev) => {
-      const existingIds = new Set(prev.map((item) => item.id));
-      const uniqueIncoming = incoming.filter((item) => !existingIds.has(item.id));
-      if (uniqueIncoming.length === 0) return prev;
+    const knownIds = knownNotificationIdsRef.current;
+    const uniqueIncoming = incoming.filter((item) => !knownIds.has(item.id));
+    if (uniqueIncoming.length === 0) return;
 
+    uniqueIncoming.forEach((item) => knownIds.add(item.id));
+
+    setNotifications((prev) => {
       return [...uniqueIncoming, ...prev]
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 120);
     });
+
+    setUnreadCount((prev) => prev + uniqueIncoming.filter((item) => !item.read).length);
   };
 
   const fetchNotifications = async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -57,8 +62,11 @@ export function AdminNotifications() {
     try {
       const res = await getAdminNotifications({ limit: 40 });
       const sorted = [...res.data].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
       setNotifications(sorted);
       setUnreadCount(res.meta.unreadCount ?? sorted.filter((n) => !n.read).length);
+
+      knownNotificationIdsRef.current = new Set(sorted.map((item) => item.id));
     } catch {
       if (!silent) {
         toast.error("Impossible de charger les notifications.");
@@ -108,7 +116,6 @@ export function AdminNotifications() {
     const channel = echo.private("admin.notifications");
     channel.listen(".admin.notification.created", (event: Notification) => {
       mergeNotifications([{ ...event, read: false }]);
-      setUnreadCount((prev) => prev + 1);
     });
 
     channelBoundRef.current = true;
@@ -158,6 +165,7 @@ export function AdminNotifications() {
     if (!target) return;
 
     setNotifications((prev) => prev.filter((n) => n.id !== id));
+    knownNotificationIdsRef.current.delete(id);
     if (!target.read) {
       setUnreadCount((prev) => Math.max(0, prev - 1));
     }
@@ -166,7 +174,7 @@ export function AdminNotifications() {
       await deleteAdminNotification(id);
       toast.success("Notification supprimee.");
     } catch {
-      await loadInitial();
+      await fetchNotifications();
       toast.error("Impossible de supprimer la notification.");
     }
   };
@@ -176,6 +184,7 @@ export function AdminNotifications() {
 
     setNotifications([]);
     setUnreadCount(0);
+    knownNotificationIdsRef.current = new Set();
 
     try {
       await deleteAllAdminNotifications();
@@ -183,6 +192,7 @@ export function AdminNotifications() {
     } catch {
       setNotifications(previous);
       setUnreadCount(previous.filter((n) => !n.read).length);
+      knownNotificationIdsRef.current = new Set(previous.map((n) => n.id));
       toast.error("Impossible de supprimer toutes les notifications.");
     }
   };

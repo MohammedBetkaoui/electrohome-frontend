@@ -27,7 +27,6 @@ import { AdminBlog } from "./pages/admin/AdminBlog";
 import { AdminSupport } from "./pages/admin/AdminSupport";
 import { AdminSettings } from "./pages/admin/AdminSettings";
 import { AdminAnalytics } from "./pages/admin/AdminAnalytics";
-import { AdminInvoices } from "./pages/admin/AdminInvoices";
 import { AdminInventory } from "./pages/admin/AdminInventory";
 import { AdminReviews } from "./pages/admin/AdminReviews";
 import { AdminCategories } from "./pages/admin/AdminCategories";
@@ -110,7 +109,6 @@ export const router = createBrowserRouter([
       { path: "commandes/:id", Component: AdminOrderDetail },
       { path: "retours", Component: AdminReturns },
       { path: "clients", Component: AdminClients },
-      { path: "factures", Component: AdminInvoices },
       { path: "inventaire", Component: AdminInventory },
       { path: "fournisseurs", Component: AdminSuppliers },
       { path: "promotions", Component: AdminPromotions },
