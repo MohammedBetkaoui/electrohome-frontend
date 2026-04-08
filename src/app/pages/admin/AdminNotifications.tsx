@@ -50,7 +50,7 @@ export function AdminNotifications() {
 
     setNotifications((prev) => {
       return [...uniqueIncoming, ...prev]
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.d     ate).getTime())
         .slice(0, 120);
     });
 
