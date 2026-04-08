@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Truck, Shield, Headphones, Award, ChevronRight, ArrowRight, Timer } from "lucide-react";
 import { toast } from "sonner";
-import { BRANDS, CATEGORIES, IMAGES, formatPrice, useStore } from "../data/store";
+import { BRANDS, IMAGES, formatPrice, useStore } from "../data/store";
+import { getCatalogCategories, type CatalogCategory } from "../api/categories";
 import { getCatalogProducts } from "../api/products";
 import { ProductCard } from "../components/ProductCard";
 import { Skeleton } from "../components/ui/skeleton";
@@ -74,11 +75,51 @@ function ProductGridSkeleton() {
   );
 }
 
+function CategoryGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <Skeleton key={index} className="aspect-[4/3] w-full rounded-xl" />
+      ))}
+    </div>
+  );
+}
+
 export function HomePage() {
   const { addToCart } = useStore();
+  const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoriesError, setCategoriesError] = useState("");
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState("");
+
+  useEffect(() => {
+    let ignore = false;
+
+    setCategoriesLoading(true);
+
+    getCatalogCategories(8)
+      .then((items) => {
+        if (ignore) return;
+        setCategories(items);
+        setCategoriesError("");
+      })
+      .catch((error) => {
+        if (ignore) return;
+        setCategories([]);
+        setCategoriesError(error instanceof Error ? error.message : "Impossible de charger les categories.");
+      })
+      .finally(() => {
+        if (!ignore) {
+          setCategoriesLoading(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -108,6 +149,7 @@ export function HomePage() {
   }, []);
 
   const flashProducts = featuredProducts.filter((product) => product.oldPrice).slice(0, 3);
+  const firstCategorySlug = categories[0]?.slug || "refrigerateurs";
 
   const handleFlashAddToCart = (product: Product) => {
     const result = addToCart(product);
@@ -169,26 +211,35 @@ export function HomePage() {
       <section className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-20 py-16">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl" style={{ fontWeight: 600 }}>Nos categories</h2>
-          <Link to="/categorie/refrigerateurs" className="text-sm text-[#E8400C] flex items-center gap-1 hover:gap-2 transition-all">
+          <Link to={`/categorie/${firstCategorySlug}`} className="text-sm text-[#E8400C] flex items-center gap-1 hover:gap-2 transition-all">
             Tout voir <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {CATEGORIES.map((category) => (
-            <Link
-              key={category.slug}
-              to={`/categorie/${category.slug}`}
-              className="group relative aspect-[4/3] rounded-xl overflow-hidden"
-            >
-              <img src={category.image} alt={category.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-              <div className="absolute bottom-4 left-4 right-4">
-                <h3 className="text-white text-sm mb-0.5" style={{ fontWeight: 600 }}>{category.name}</h3>
-                <p className="text-white/70 text-xs">{category.count} produits</p>
-              </div>
-            </Link>
-          ))}
-        </div>
+
+        {categoriesLoading ? (
+          <CategoryGridSkeleton />
+        ) : categories.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {categories.map((category) => (
+              <Link
+                key={category.slug}
+                to={`/categorie/${category.slug}`}
+                className="group relative aspect-[4/3] rounded-xl overflow-hidden"
+              >
+                <img src={category.image} alt={category.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                <div className="absolute bottom-4 left-4 right-4">
+                  <h3 className="text-white text-sm mb-0.5" style={{ fontWeight: 600 }}>{category.name}</h3>
+                  <p className="text-white/70 text-xs">{category.count} produits</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+            {categoriesError || "Aucune categorie n'est disponible pour le moment."}
+          </div>
+        )}
       </section>
 
       <section className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-20 pb-16">

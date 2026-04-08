@@ -244,22 +244,16 @@ export function Header() {
               ))}
               {isAuthenticated ? (
                 <>
-                  <Link to="/compte" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 rounded-lg text-sm text-[#E8400C] font-medium">
-                    👤 {user?.full_name}
-                  </Link>
+                 
                   <button onClick={() => { handleLogout(); setMenuOpen(false); }} className="block w-full text-left px-4 py-2.5 rounded-lg text-sm text-red-500">
                     Déconnexion
                   </button>
                   {user?.is_admin && (
                     <Link to="/admin" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 rounded-lg text-sm text-[#FF6B35]">
-                      🔧 Administration
+                       Administration
                     </Link>
                   )}
-                  {user?.is_admin && (
-                    <Link to="/admin/notifications" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 rounded-lg text-sm text-[#FF6B35]">
-                      🔔 Notifications{adminUnreadCount > 0 ? ` (${adminUnreadCount > 99 ? "99+" : adminUnreadCount})` : ""}
-                    </Link>
-                  )}
+                 
                 </>
               ) : (
                 <Link to="/auth" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 rounded-lg text-sm text-[#E8400C]">
@@ -286,19 +280,6 @@ export function Header() {
               <span className="text-[10px]">{item.label}</span>
             </Link>
           ))}
-          {user?.is_admin && (
-            <Link to="/admin/notifications" className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors">
-              <div className="relative">
-                <Bell className="w-5 h-5" />
-                {adminUnreadCount > 0 && (
-                  <span className="absolute -top-1 -right-2 min-w-[14px] h-3.5 px-1 rounded-full bg-[#E8400C] dark:bg-[#FF5722] text-white text-[8px] flex items-center justify-center" style={{ fontWeight: 600 }}>
-                    {adminUnreadCount > 99 ? "99+" : adminUnreadCount}
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px]">Notif</span>
-            </Link>
-          )}
         </div>
       </nav>
     </>

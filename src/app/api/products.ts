@@ -99,11 +99,15 @@ function mapCatalogProduct(product: CatalogProductResponse): Product {
   };
 }
 
-export async function getCatalogProducts(limit?: number): Promise<Product[]> {
+export async function getCatalogProducts(limit?: number, categorySlug?: string): Promise<Product[]> {
   const searchParams = new URLSearchParams();
 
   if (limit) {
     searchParams.set("limit", String(limit));
+  }
+
+  if (categorySlug) {
+    searchParams.set("category", categorySlug);
   }
 
   const query = searchParams.toString();
