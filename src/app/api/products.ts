@@ -21,6 +21,26 @@ interface CatalogProductResponse {
   createdAt?: string | null;
 }
 
+export type CatalogProductsSort =
+  | "relevance"
+  | "newest"
+  | "price_asc"
+  | "price_desc"
+  | "name_asc"
+  | "discount_desc";
+
+export interface CatalogProductsQuery {
+  limit?: number;
+  categorySlug?: string;
+  q?: string;
+  brand?: string | string[];
+  minPrice?: number;
+  maxPrice?: number;
+  inStock?: boolean;
+  hasDiscount?: boolean;
+  sort?: CatalogProductsSort;
+}
+
 async function fetchCatalog<T>(endpoint: string): Promise<T> {
   const response = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
@@ -99,15 +119,55 @@ function mapCatalogProduct(product: CatalogProductResponse): Product {
   };
 }
 
-export async function getCatalogProducts(limit?: number, categorySlug?: string): Promise<Product[]> {
+export async function getCatalogProducts(
+  limitOrOptions?: number | CatalogProductsQuery,
+  categorySlugArg?: string,
+): Promise<Product[]> {
+  const options: CatalogProductsQuery = typeof limitOrOptions === "object" && limitOrOptions !== null
+    ? limitOrOptions
+    : { limit: limitOrOptions, categorySlug: categorySlugArg };
+
   const searchParams = new URLSearchParams();
 
-  if (limit) {
-    searchParams.set("limit", String(limit));
+  if (options.limit) {
+    searchParams.set("limit", String(options.limit));
   }
 
-  if (categorySlug) {
-    searchParams.set("category", categorySlug);
+  if (options.categorySlug) {
+    searchParams.set("category", options.categorySlug);
+  }
+
+  if (options.q?.trim()) {
+    searchParams.set("q", options.q.trim());
+  }
+
+  if (options.brand) {
+    const brands = Array.isArray(options.brand) ? options.brand : [options.brand];
+    const normalizedBrands = brands.map((brand) => brand.trim()).filter(Boolean);
+
+    if (normalizedBrands.length > 0) {
+      searchParams.set("brand", normalizedBrands.join(","));
+    }
+  }
+
+  if (typeof options.minPrice === "number" && Number.isFinite(options.minPrice)) {
+    searchParams.set("min_price", String(options.minPrice));
+  }
+
+  if (typeof options.maxPrice === "number" && Number.isFinite(options.maxPrice)) {
+    searchParams.set("max_price", String(options.maxPrice));
+  }
+
+  if (options.inStock) {
+    searchParams.set("in_stock", "1");
+  }
+
+  if (options.hasDiscount) {
+    searchParams.set("has_discount", "1");
+  }
+
+  if (options.sort) {
+    searchParams.set("sort", options.sort);
   }
 
   const query = searchParams.toString();
