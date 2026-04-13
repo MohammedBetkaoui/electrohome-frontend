@@ -51,6 +51,9 @@ const STATUS_MAP: Record<
 };
 
 type ViewMode = "all" | "critical" | "best_value";
+type PaginationToken = number | "ellipsis-left" | "ellipsis-right";
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 function formatPrice(price: number) {
   return price.toLocaleString("fr-DZ") + " DA";
@@ -84,6 +87,8 @@ export function AdminInventory() {
   );
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [viewMode, setViewMode] = useState<ViewMode>("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -147,6 +152,10 @@ export function AdminInventory() {
     void loadInventory();
   }, [debouncedSearch, statusFilter, categoryFilter]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter, categoryFilter, viewMode, pageSize]);
+
   const categories = useMemo(
     () => [...new Set(items.map((item) => item.category).filter(Boolean))],
     [items],
@@ -197,6 +206,69 @@ export function AdminInventory() {
         .reduce((sum, item) => sum + item.stockValue, 0),
     };
   }, [items, viewMode]);
+
+  const pagination = useMemo(() => {
+    const totalItems = computed.visibleItems.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const currentPage = Math.min(page, totalPages);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+
+    const pageItems = computed.visibleItems.slice(startIndex, endIndex);
+
+    const from = totalItems === 0 ? 0 : startIndex + 1;
+    const to = totalItems === 0 ? 0 : Math.min(endIndex, totalItems);
+
+    const pages: PaginationToken[] = [];
+
+    if (totalPages <= 7) {
+      for (let index = 1; index <= totalPages; index += 1) {
+        pages.push(index);
+      }
+    } else {
+      pages.push(1);
+
+      const showLeftEllipsis = currentPage > 4;
+      const showRightEllipsis = currentPage < totalPages - 3;
+
+      if (showLeftEllipsis) {
+        pages.push("ellipsis-left");
+      }
+
+      const windowStart = showLeftEllipsis ? Math.max(2, currentPage - 1) : 2;
+      const windowEnd = showRightEllipsis
+        ? Math.min(totalPages - 1, currentPage + 1)
+        : totalPages - 1;
+
+      for (let index = windowStart; index <= windowEnd; index += 1) {
+        pages.push(index);
+      }
+
+      if (showRightEllipsis) {
+        pages.push("ellipsis-right");
+      }
+
+      pages.push(totalPages);
+    }
+
+    return {
+      totalItems,
+      totalPages,
+      currentPage,
+      from,
+      to,
+      pageItems,
+      pages,
+      canGoPrevious: currentPage > 1,
+      canGoNext: currentPage < totalPages,
+    };
+  }, [computed.visibleItems, page, pageSize]);
+
+  useEffect(() => {
+    if (page > pagination.totalPages) {
+      setPage(pagination.totalPages);
+    }
+  }, [page, pagination.totalPages]);
 
   const handleRefresh = async () => {
     await Promise.all([
@@ -294,8 +366,8 @@ export function AdminInventory() {
         <div className="space-y-5">
           <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-white/10 dark:bg-[#1E1E24]">
             <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative min-w-[220px] flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <div className="relative w-full sm:min-w-[220px] sm:flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
                   <input
                     value={search}
@@ -310,7 +382,7 @@ export function AdminInventory() {
                   onChange={(e) =>
                     setStatusFilter(e.target.value as InventoryStatus | "all")
                   }
-                  className="rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2.5 text-[13px] text-[#1A2332] outline-none dark:border-white/10 dark:bg-white/5 dark:text-white"
+                  className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2.5 text-[13px] text-[#1A2332] outline-none sm:w-auto dark:border-white/10 dark:bg-white/5 dark:text-white"
                 >
                   <option value="all">Tous les statuts</option>
                   {Object.entries(STATUS_MAP).map(([key, value]) => (
@@ -323,7 +395,7 @@ export function AdminInventory() {
                 <select
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2.5 text-[13px] text-[#1A2332] outline-none dark:border-white/10 dark:bg-white/5 dark:text-white"
+                  className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2.5 text-[13px] text-[#1A2332] outline-none sm:w-auto dark:border-white/10 dark:bg-white/5 dark:text-white"
                 >
                   <option value="all">Toutes catégories</option>
                   {categories.map((category) => (
@@ -336,7 +408,7 @@ export function AdminInventory() {
                 <button
                   onClick={() => void handleRefresh()}
                   disabled={isRefreshing}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#E5E7EB] text-[#6B7280] hover:text-[#FF6B35] disabled:opacity-50 dark:border-white/10"
+                  className="flex h-10 w-full items-center justify-center rounded-xl border border-[#E5E7EB] text-[#6B7280] hover:text-[#FF6B35] disabled:opacity-50 sm:w-10 dark:border-white/10"
                 >
                   <RefreshCw
                     className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
@@ -345,7 +417,7 @@ export function AdminInventory() {
 
                 <button
                   onClick={handleExport}
-                  className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] px-3 py-2.5 text-[12px] text-[#6B7280] hover:border-[#FF6B35] hover:text-[#FF6B35] dark:border-white/10"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] px-3 py-2.5 text-[12px] text-[#6B7280] hover:border-[#FF6B35] hover:text-[#FF6B35] sm:w-auto dark:border-white/10"
                   style={{ fontWeight: 500 }}
                 >
                   <Download className="h-3.5 w-3.5" /> Exporter
@@ -393,7 +465,133 @@ export function AdminInventory() {
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FF6B35] border-t-transparent" />
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+                <div className="divide-y divide-[#E5E7EB] dark:divide-white/10 md:hidden">
+                  {pagination.totalItems === 0 ? (
+                    <div className="py-12 text-center text-[13px] text-[#9CA3AF]">
+                      Aucun article trouvé
+                    </div>
+                  ) : (
+                    pagination.pageItems.map((item) => {
+                      const statusConfig = STATUS_MAP[item.status];
+                      const coverageTone =
+                        item.coverageDays <= 30
+                          ? "#EF4444"
+                          : item.coverageDays <= 60
+                            ? "#F59E0B"
+                            : "#10B981";
+
+                      return (
+                        <article key={item.id} className="space-y-3 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p
+                                className="truncate text-[14px] text-[#1A2332] dark:text-white"
+                                style={{ fontWeight: 700 }}
+                              >
+                                {item.name}
+                              </p>
+                              <p className="mt-1 truncate text-[11px] text-[#9CA3AF]">
+                                <span className="font-mono">{item.sku}</span> • {item.category}
+                              </p>
+                              <p className="truncate text-[11px] text-[#9CA3AF]">
+                                Fournisseur: {item.supplier}
+                              </p>
+                            </div>
+
+                            <span
+                              className="inline-flex rounded-full px-2.5 py-1 text-[10px]"
+                              style={{
+                                fontWeight: 700,
+                                backgroundColor: `${statusConfig.color}15`,
+                                color: statusConfig.color,
+                              }}
+                            >
+                              {statusConfig.label}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-center">
+                            {[
+                              {
+                                label: "Stock",
+                                value: item.stock,
+                                valueClass: "text-[#1A2332] dark:text-white",
+                              },
+                              {
+                                label: "Réservé",
+                                value: item.reserved,
+                                valueClass: "text-[#8B5CF6]",
+                              },
+                              {
+                                label: "Disponible",
+                                value: item.available,
+                                valueClass: "text-[#1A2332] dark:text-white",
+                              },
+                              {
+                                label: "Seuil",
+                                value: item.minStock,
+                                valueClass: "text-[#6B7280] dark:text-white/70",
+                              },
+                            ].map((metric) => (
+                              <div
+                                key={metric.label}
+                                className="rounded-lg bg-[#F9FAFB] px-2 py-2 dark:bg-white/5"
+                              >
+                                <p className="text-[10px] text-[#9CA3AF]">{metric.label}</p>
+                                <p
+                                  className={`text-[13px] ${metric.valueClass}`}
+                                  style={{ fontWeight: 700 }}
+                                >
+                                  {metric.value}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#E5E7EB] dark:bg-white/10">
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${Math.min(
+                                    100,
+                                    Math.max(
+                                      8,
+                                      (item.available / Math.max(item.stock, 1)) * 100,
+                                    ),
+                                  )}%`,
+                                  backgroundColor: statusConfig.color,
+                                }}
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-[#9CA3AF]">
+                                MAJ {formatDate(item.lastRestocked)}
+                              </span>
+                              <span style={{ color: coverageTone, fontWeight: 700 }}>
+                                {item.coverageDays} j
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[12px]">
+                              <span className="text-[#9CA3AF]">Valeur stock</span>
+                              <span
+                                className="text-[#1A2332] dark:text-white"
+                                style={{ fontWeight: 700 }}
+                              >
+                                {formatPrice(item.stockValue)}
+                              </span>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
                 <table className="w-full text-[13px]">
                   <thead>
                     <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB] dark:border-white/10 dark:bg-white/5">
@@ -418,7 +616,7 @@ export function AdminInventory() {
                     </tr>
                   </thead>
                   <tbody>
-                    {computed.visibleItems.length === 0 ? (
+                    {pagination.totalItems === 0 ? (
                       <tr>
                         <td
                           colSpan={8}
@@ -428,7 +626,7 @@ export function AdminInventory() {
                         </td>
                       </tr>
                     ) : (
-                      computed.visibleItems.map((item) => {
+                      pagination.pageItems.map((item) => {
                         const statusConfig = STATUS_MAP[item.status];
                         const coverageTone =
                           item.coverageDays <= 30
@@ -543,7 +741,79 @@ export function AdminInventory() {
                     )}
                   </tbody>
                 </table>
-              </div>
+                </div>
+
+                <div className="flex flex-col gap-3 border-t border-[#E5E7EB] p-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[12px] text-[#6B7280] dark:text-white/60">
+                    Affichage {pagination.from} à {pagination.to} sur {pagination.totalItems}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-2 text-[12px] text-[#6B7280] dark:text-white/60">
+                      Lignes
+                      <select
+                        value={pageSize}
+                        onChange={(event) => {
+                          setPageSize(Number(event.target.value));
+                        }}
+                        className="rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] px-2 py-1.5 text-[12px] text-[#1A2332] outline-none dark:border-white/10 dark:bg-white/5 dark:text-white"
+                      >
+                        {PAGE_SIZE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <button
+                      onClick={() => setPage((current) => Math.max(1, current - 1))}
+                      disabled={!pagination.canGoPrevious}
+                      className="rounded-lg border border-[#E5E7EB] px-3 py-1.5 text-[12px] text-[#6B7280] disabled:opacity-50 dark:border-white/10 dark:text-white/70"
+                      style={{ fontWeight: 600 }}
+                    >
+                      Précédent
+                    </button>
+
+                    {pagination.pages.map((token, index) =>
+                      typeof token === "number" ? (
+                        <button
+                          key={token}
+                          onClick={() => setPage(token)}
+                          className={`rounded-lg px-3 py-1.5 text-[12px] ${
+                            pagination.currentPage === token
+                              ? "bg-[#FF6B35] text-white"
+                              : "border border-[#E5E7EB] text-[#6B7280] dark:border-white/10 dark:text-white/70"
+                          }`}
+                          style={{ fontWeight: 700 }}
+                        >
+                          {token}
+                        </button>
+                      ) : (
+                        <span
+                          key={`${token}-${index}`}
+                          className="px-1 text-[12px] text-[#9CA3AF]"
+                        >
+                          ...
+                        </span>
+                      ),
+                    )}
+
+                    <button
+                      onClick={() =>
+                        setPage((current) =>
+                          Math.min(pagination.totalPages, current + 1),
+                        )
+                      }
+                      disabled={!pagination.canGoNext}
+                      className="rounded-lg border border-[#E5E7EB] px-3 py-1.5 text-[12px] text-[#6B7280] disabled:opacity-50 dark:border-white/10 dark:text-white/70"
+                      style={{ fontWeight: 600 }}
+                    >
+                      Suivant
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
