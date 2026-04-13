@@ -2,13 +2,14 @@ import { getToken } from "./auth";
 
 const API_URL = "http://localhost:8000/api/admin";
 
-export type AdminNotifType = "order" | "client";
+export type AdminNotifType = "order" | "client" | "inventory";
 
 export interface AdminNotification {
   id: number;
   title: string;
   message: string;
   type: AdminNotifType;
+  payload?: Record<string, unknown> | null;
   date: string;
   read: boolean;
 }

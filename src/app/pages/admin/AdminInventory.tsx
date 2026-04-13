@@ -602,7 +602,7 @@ export function AdminInventory() {
                         "Réservé",
                         "Disponible",
                         "Seuil",
-                        "Couverture",
+                        
                         "Valeur",
                       ].map((header) => (
                         <th
@@ -712,17 +712,7 @@ export function AdminInventory() {
                               <div className="text-[11px]">minimum visé</div>
                             </td>
 
-                            <td className="px-4 py-3">
-                              <span
-                                className="text-[12px]"
-                                style={{ color: coverageTone, fontWeight: 700 }}
-                              >
-                                {item.coverageDays} j
-                              </span>
-                              <p className="text-[11px] text-[#9CA3AF]">
-                                selon le seuil actuel
-                              </p>
-                            </td>
+                           
 
                             <td className="px-4 py-3">
                               <div

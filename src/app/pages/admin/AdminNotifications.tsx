@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ShoppingCart, Users, RefreshCw, Trash2 } from "lucide-react";
+import { Link } from "react-router";
+import { ShoppingCart, Users, RefreshCw, Trash2, Boxes } from "lucide-react";
 import { toast } from "sonner";
 import {
   getAdminNotifications,
@@ -18,6 +19,7 @@ type Notification = AdminNotification;
 const TYPE_CFG: Record<NotifType, { label: string; color: string; icon: any }> = {
   order: { label: "Commande", color: "#FF6B35", icon: ShoppingCart },
   client: { label: "Client", color: "#8B5CF6", icon: Users },
+  inventory: { label: "Inventaire", color: "#F59E0B", icon: Boxes },
 };
 
 function timeAgo(date: string) {
@@ -240,7 +242,7 @@ export function AdminNotifications() {
       <div className="bg-white dark:bg-[#1E1E24] rounded-xl border border-[#E5E7EB] dark:border-white/10 divide-y divide-[#E5E7EB]/50 dark:divide-white/5">
         {isLoading && <div className="text-center py-12 text-[#9CA3AF] text-[13px]">Chargement des notifications...</div>}
         {filtered.map((n) => {
-          const cfg = TYPE_CFG[n.type];
+          const cfg = TYPE_CFG[n.type] ?? TYPE_CFG.inventory;
           const Icon = cfg.icon;
           return (
             <div key={n.id} onClick={() => void markRead(n.id)}
@@ -254,6 +256,15 @@ export function AdminNotifications() {
                   <p className="text-[13px] text-[#1A2332] dark:text-white truncate" style={{ fontWeight: n.read ? 400 : 600 }}>{n.title}</p>
                 </div>
                 <p className="text-[12px] text-[#6B7280] dark:text-white/50">{n.message}</p>
+                {n.type === "inventory" && (
+                  <Link
+                    to="/admin/inventaire"
+                    className="inline-flex mt-1 text-[11px] text-[#F59E0B] hover:underline"
+                    style={{ fontWeight: 600 }}
+                  >
+                    Ouvrir la page Inventaire
+                  </Link>
+                )}
                 <p className="text-[11px] text-[#9CA3AF] mt-1">{timeAgo(n.date)}</p>
               </div>
               <span className="text-[10px] px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: cfg.color + "15", color: cfg.color, fontWeight: 500 }}>{cfg.label}</span>
