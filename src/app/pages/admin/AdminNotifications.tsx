@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { ShoppingCart, Users, RefreshCw, Trash2, Boxes } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -31,11 +31,24 @@ function timeAgo(date: string) {
   return `Il y a ${Math.floor(hrs / 24)}j`;
 }
 
+function normalizeTypeFilter(value: string | null): NotifType | "all" {
+  if (value === "order" || value === "client" || value === "inventory") {
+    return value;
+  }
+
+  return "all";
+}
+
 export function AdminNotifications() {
+  const [searchParams] = useSearchParams();
+  const urlTypeFilter = searchParams.get("type");
+
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState<NotifType | "all">(
+    normalizeTypeFilter(urlTypeFilter),
+  );
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const channelBoundRef = useRef(false);
@@ -91,6 +104,10 @@ export function AdminNotifications() {
   useEffect(() => {
     void fetchNotifications();
   }, []);
+
+  useEffect(() => {
+    setTypeFilter(normalizeTypeFilter(urlTypeFilter));
+  }, [urlTypeFilter]);
 
   useEffect(() => {
     if (channelBoundRef.current) return;
@@ -221,7 +238,7 @@ export function AdminNotifications() {
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </button>
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+          <select value={typeFilter} onChange={(e) => setTypeFilter(normalizeTypeFilter(e.target.value))}
             className="px-3 py-2 rounded-lg bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] outline-none text-[#1A2332] dark:text-white">
             <option value="all">Tous les types</option>
             {Object.entries(TYPE_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}

@@ -1,6 +1,6 @@
 import { Bell, Search, Moon, Sun, Menu, ExternalLink } from "lucide-react";
 import { Link } from "react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSidebar } from "./AdminLayout";
 import { useStore } from "../../data/store";
 import { getAdminNotifications, type AdminNotification } from "../../api/adminNotifications";
@@ -12,6 +12,8 @@ export function AdminTopbar({ title }: { title: string }) {
   const { setMobileOpen } = useSidebar();
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadPreview, setUnreadPreview] = useState<AdminNotification[]>([]);
+  const [inventoryUnreadCount, setInventoryUnreadCount] = useState(0);
+  const [previewTypeFilter, setPreviewTypeFilter] = useState<"all" | "inventory">("all");
   const [notifOpen, setNotifOpen] = useState(false);
   const channelBoundRef = useRef(false);
   const notifMenuRef = useRef<HTMLDivElement | null>(null);
@@ -24,9 +26,11 @@ export function AdminTopbar({ title }: { title: string }) {
       const hasNewSinceLastRefresh = hasLoadedOnceRef.current
         ? res.data.some((item) => !knownNotificationIdsRef.current.has(item.id))
         : false;
+      const unreadItems = res.data.filter((n) => !n.read);
 
       setUnreadCount(res.meta.unreadCount ?? 0);
-      setUnreadPreview(res.data.filter((n) => !n.read).slice(0, 5));
+      setUnreadPreview(unreadItems.slice(0, 12));
+      setInventoryUnreadCount(unreadItems.filter((n) => n.type === "inventory").length);
       knownNotificationIdsRef.current = new Set(res.data.map((item) => item.id));
       hasLoadedOnceRef.current = true;
 
@@ -72,10 +76,13 @@ export function AdminTopbar({ title }: { title: string }) {
 
       knownNotificationIdsRef.current.add(_event.id);
       setUnreadCount((prev) => prev + 1);
+      if (_event.type === "inventory") {
+        setInventoryUnreadCount((prev) => prev + 1);
+      }
       setUnreadPreview((prev) => [
         { ..._event, read: false },
         ...prev.filter((n) => n.id !== _event.id),
-      ].slice(0, 5));
+      ].slice(0, 12));
       playAdminNotificationSound();
     });
 
@@ -101,6 +108,18 @@ export function AdminTopbar({ title }: { title: string }) {
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [notifOpen]);
+
+  const previewItems = useMemo(() => {
+    if (previewTypeFilter === "inventory") {
+      return unreadPreview.filter((item) => item.type === "inventory").slice(0, 5);
+    }
+
+    return unreadPreview.slice(0, 5);
+  }, [previewTypeFilter, unreadPreview]);
+
+  const notificationsPageLink = previewTypeFilter === "inventory"
+    ? "/admin/notifications?type=inventory"
+    : "/admin/notifications";
 
   return (
     <header
@@ -165,18 +184,44 @@ export function AdminTopbar({ title }: { title: string }) {
                 <p className="text-[13px] text-[#1A2332] dark:text-white" style={{ fontWeight: 600 }}>
                   Notifications non lues
                 </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    onClick={() => setPreviewTypeFilter("all")}
+                    className={`px-2.5 py-1 rounded-md text-[11px] transition-colors ${
+                      previewTypeFilter === "all"
+                        ? "bg-[#FF6B35] text-white"
+                        : "bg-[#F3F4F6] dark:bg-white/5 text-[#6B7280] dark:text-white/60"
+                    }`}
+                    style={{ fontWeight: 600 }}
+                  >
+                    Toutes ({unreadCount})
+                  </button>
+                  <button
+                    onClick={() => setPreviewTypeFilter("inventory")}
+                    className={`px-2.5 py-1 rounded-md text-[11px] transition-colors ${
+                      previewTypeFilter === "inventory"
+                        ? "bg-[#F59E0B] text-white"
+                        : "bg-[#F3F4F6] dark:bg-white/5 text-[#6B7280] dark:text-white/60"
+                    }`}
+                    style={{ fontWeight: 600 }}
+                  >
+                    Inventaire ({inventoryUnreadCount})
+                  </button>
+                </div>
               </div>
 
               <div className="max-h-[280px] overflow-y-auto">
-                {unreadPreview.length === 0 ? (
+                {previewItems.length === 0 ? (
                   <div className="px-4 py-6 text-[12px] text-[#9CA3AF] text-center">
-                    Aucune notification non lue
+                    {previewTypeFilter === "inventory"
+                      ? "Aucune alerte inventaire non lue"
+                      : "Aucune notification non lue"}
                   </div>
                 ) : (
-                  unreadPreview.map((item) => (
+                  previewItems.map((item) => (
                     <Link
                       key={item.id}
-                      to="/admin/notifications"
+                      to={item.type === "inventory" ? "/admin/notifications?type=inventory" : "/admin/notifications"}
                       onClick={() => setNotifOpen(false)}
                       className="block px-4 py-3 border-b border-[#E5E7EB]/60 dark:border-white/5 hover:bg-[#F9FAFB] dark:hover:bg-white/5 transition-colors"
                     >
@@ -193,12 +238,14 @@ export function AdminTopbar({ title }: { title: string }) {
 
               <div className="px-4 py-3 bg-[#F9FAFB] dark:bg-white/5">
                 <Link
-                  to="/admin/notifications"
+                  to={notificationsPageLink}
                   onClick={() => setNotifOpen(false)}
                   className="text-[12px] text-[#FF6B35] hover:underline"
                   style={{ fontWeight: 600 }}
                 >
-                  Voir la page des notifications
+                  {previewTypeFilter === "inventory"
+                    ? "Voir les alertes inventaire"
+                    : "Voir la page des notifications"}
                 </Link>
               </div>
             </div>
