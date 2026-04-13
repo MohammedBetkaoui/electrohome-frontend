@@ -1,7 +1,7 @@
 import { NavLink } from "react-router";
 import {
   LayoutDashboard, Package, ShoppingCart, RotateCcw, Users,
-  FileText, Headphones, Settings, ChevronLeft, ChevronRight, LogOut, Zap, X,
+  FileText, Headphones, Settings, ChevronLeft, ChevronRight, LogOut, X,
   BarChart3, Boxes, Star, Grid3X3, ClipboardList,
   Building2, Bell, Flame
 } from "lucide-react";
@@ -78,14 +78,13 @@ export function AdminSidebar() {
         {/* Logo */}
         <div className="flex items-center justify-between px-5 h-16 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#FF6B35] flex items-center justify-center shrink-0">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
-            {showLabels && (
-              <span className="text-[15px] tracking-tight" style={{ fontWeight: 600 }}>
-                ElectroHome
-              </span>
-            )}
+            <img
+              src="/logo.png"
+              alt="ElectroHome"
+              className="w-27 h-27 object-contain shrink-0 items-center justify-center"
+              loading="lazy"
+            />
+           
           </div>
           {/* Close button (mobile only) */}
           <button
