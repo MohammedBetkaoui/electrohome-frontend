@@ -50,7 +50,6 @@ const TITLES: Record<string, string> = {
   "/admin/retours": "Gestion des Retours",
   "/admin/clients": "Gestion des Clients",
   "/admin/inventaire": "Inventaire & Stock",
-  "/admin/fournisseurs": "Fournisseurs",
   "/admin/promotions": "Promotions",
   "/admin/avis": "Avis Clients",
   "/admin/blog": "Blog",
