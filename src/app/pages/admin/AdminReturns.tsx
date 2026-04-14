@@ -2,13 +2,15 @@ import { useState, useMemo, useEffect } from "react";
 import {
   Search, Eye, X, ChevronLeft, ChevronRight, ArrowUpDown,
   RotateCcw, Package, AlertTriangle, Mail, Phone, MapPin,
-  Download, Printer, Camera, MessageSquare, CreditCard, BarChart3
+  Download, Printer, Camera, MessageSquare, CreditCard, BarChart3,
+  Clock, CheckCircle2, Truck
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getReturn,
   getReturns,
   type AdminReturn,
+  type ReturnStatus,
 } from "../../api/adminReturns";
 
 const REASON_LABELS: Record<string, string> = {
@@ -20,6 +22,19 @@ const REASON_LABELS: Record<string, string> = {
   late_delivery: "Livraison trop tardive",
   refused_delivery: "Refuse a la livraison",
   customer_absent: "Client absent",
+};
+
+const RETURN_STATUS_CONFIG: Record<
+  ReturnStatus,
+  { label: string; color: string; icon: any }
+> = {
+  pending: { label: "En attente", color: "#F59E0B", icon: Clock },
+  approved: { label: "Approuve", color: "#3B82F6", icon: CheckCircle2 },
+  pickup: { label: "Collecte", color: "#06B6D4", icon: Truck },
+  received: { label: "Recu", color: "#8B5CF6", icon: Package },
+  inspecting: { label: "Inspection", color: "#6366F1", icon: Eye },
+  refunded: { label: "Rembourse", color: "#10B981", icon: CreditCard },
+  rejected: { label: "Rejete", color: "#EF4444", icon: X },
 };
 
 function formatPrice(price: number) {
@@ -310,7 +325,103 @@ export function AdminReturns() {
 
       {/* Table */}
       <div className="bg-white dark:bg-[#1E1E24] rounded-xl border border-[#E5E7EB] dark:border-white/10 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="md:hidden p-3 space-y-3">
+          {paginated.length === 0 ? (
+            <div className="text-center py-10 text-[#9CA3AF] text-[13px]">
+              Aucun retour trouve
+            </div>
+          ) : (
+            paginated.map((r) => {
+              const status = RETURN_STATUS_CONFIG[r.status];
+              const StatusIcon = status.icon;
+
+              return (
+                <article
+                  key={r.id}
+                  className="rounded-2xl border border-[#E5E7EB] dark:border-white/10 bg-[linear-gradient(135deg,rgba(255,107,53,0.05),rgba(59,130,246,0.03))] dark:bg-white/[0.02] p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p
+                        className="text-[#1A2332] dark:text-white truncate"
+                        style={{ fontWeight: 700 }}
+                      >
+                        {r.id}
+                      </p>
+                      <p className="text-[12px] text-[#FF6B35] truncate mt-0.5">
+                        {r.orderId || "Commande inconnue"}
+                      </p>
+                    </div>
+
+                    <span
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] shrink-0"
+                      style={{
+                        fontWeight: 600,
+                        backgroundColor: status.color + "15",
+                        color: status.color,
+                      }}
+                    >
+                      <StatusIcon className="w-3 h-3" />
+                      {status.label}
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-[12px] text-[#6B7280] dark:text-white/60 truncate">
+                    {r.client}
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <div className="rounded-xl bg-white/80 dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 px-3 py-2">
+                      <p className="text-[10px] text-[#9CA3AF]">Montant</p>
+                      <p className="text-[13px] text-[#1A2332] dark:text-white" style={{ fontWeight: 700 }}>
+                        {r.refundAmount > 0 ? formatPrice(r.refundAmount) : "-"}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-white/80 dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 px-3 py-2">
+                      <p className="text-[10px] text-[#9CA3AF]">Articles</p>
+                      <p className="text-[13px] text-[#1A2332] dark:text-white" style={{ fontWeight: 700 }}>
+                        {r.items.reduce((sum, item) => sum + item.quantity, 0)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-xl border border-[#E5E7EB] dark:border-white/10 bg-white/70 dark:bg-white/[0.03] px-3 py-2">
+                    <p className="text-[10px] text-[#9CA3AF] mb-1">Motif</p>
+                    <p className="text-[12px] text-[#6B7280] dark:text-white/65 truncate">
+                      {r.reasonLabel || REASON_LABELS[r.reason || ""] || r.reason || "-"}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3 mt-3 text-[11px] text-[#9CA3AF]">
+                    <span className="inline-flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {formatDate(r.createdAt)}
+                    </span>
+                    {r.wilaya && (
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        {r.wilaya}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-end">
+                    <button
+                      onClick={() => openDetail(r.returnId)}
+                      disabled={detailLoading}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] dark:border-white/10 px-3 py-1.5 text-[11px] text-[#6B7280] hover:text-[#FF6B35] hover:border-[#FF6B35] transition-colors disabled:opacity-50"
+                      style={{ fontWeight: 600 }}
+                    >
+                      Voir detail <Eye className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-[#E5E7EB] dark:border-white/10 bg-[#F9FAFB] dark:bg-white/5">
@@ -380,22 +491,44 @@ export function AdminReturns() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-[#E5E7EB] dark:border-white/10">
-            <p className="text-[12px] text-[#9CA3AF]">Page {page} sur {totalPages}</p>
-            <div className="flex gap-1">
-              <button disabled={page === 1} onClick={() => setPage(page - 1)} className="w-8 h-8 rounded-lg border border-[#E5E7EB] dark:border-white/10 flex items-center justify-center text-[#9CA3AF] disabled:opacity-30">
-                <ChevronLeft className="w-4 h-4" />
+          <>
+            <div className="md:hidden px-4 py-3 border-t border-[#E5E7EB] dark:border-white/10 flex items-center justify-between">
+              <button
+                disabled={page === 1}
+                onClick={() => setPage(page - 1)}
+                className="inline-flex items-center gap-1 rounded-lg border border-[#E5E7EB] dark:border-white/10 px-3 py-1.5 text-[12px] text-[#6B7280] disabled:opacity-30"
+                style={{ fontWeight: 600 }}
+              >
+                <ChevronLeft className="w-3.5 h-3.5" /> Precedent
               </button>
-              {Array.from({ length: totalPages }, (_, i) => (
-                <button key={i} onClick={() => setPage(i + 1)} className={`w-8 h-8 rounded-lg text-[12px] flex items-center justify-center ${page === i + 1 ? "bg-[#FF6B35] text-white" : "text-[#9CA3AF] hover:bg-[#F3F4F6] dark:hover:bg-white/10"}`} style={{ fontWeight: page === i + 1 ? 600 : 400 }}>
-                  {i + 1}
-                </button>
-              ))}
-              <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="w-8 h-8 rounded-lg border border-[#E5E7EB] dark:border-white/10 flex items-center justify-center text-[#9CA3AF] disabled:opacity-30">
-                <ChevronRight className="w-4 h-4" />
+              <p className="text-[12px] text-[#9CA3AF]">{page}/{totalPages}</p>
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage(page + 1)}
+                className="inline-flex items-center gap-1 rounded-lg border border-[#E5E7EB] dark:border-white/10 px-3 py-1.5 text-[12px] text-[#6B7280] disabled:opacity-30"
+                style={{ fontWeight: 600 }}
+              >
+                Suivant <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
-          </div>
+
+            <div className="hidden md:flex items-center justify-between px-4 py-3 border-t border-[#E5E7EB] dark:border-white/10">
+              <p className="text-[12px] text-[#9CA3AF]">Page {page} sur {totalPages}</p>
+              <div className="flex gap-1">
+                <button disabled={page === 1} onClick={() => setPage(page - 1)} className="w-8 h-8 rounded-lg border border-[#E5E7EB] dark:border-white/10 flex items-center justify-center text-[#9CA3AF] disabled:opacity-30">
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button key={i} onClick={() => setPage(i + 1)} className={`w-8 h-8 rounded-lg text-[12px] flex items-center justify-center ${page === i + 1 ? "bg-[#FF6B35] text-white" : "text-[#9CA3AF] hover:bg-[#F3F4F6] dark:hover:bg-white/10"}`} style={{ fontWeight: page === i + 1 ? 600 : 400 }}>
+                    {i + 1}
+                  </button>
+                ))}
+                <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="w-8 h-8 rounded-lg border border-[#E5E7EB] dark:border-white/10 flex items-center justify-center text-[#9CA3AF] disabled:opacity-30">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 

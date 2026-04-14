@@ -2,7 +2,7 @@ import { getToken } from "./auth";
 
 const API_URL = "http://localhost:8000/api/admin";
 
-export type AdminNotifType = "order" | "client" | "inventory";
+export type AdminNotifType = "order" | "client" | "inventory" | "review";
 
 export interface AdminNotification {
   id: number;

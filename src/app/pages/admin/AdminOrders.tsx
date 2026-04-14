@@ -334,7 +334,115 @@ export function AdminOrders() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className="md:hidden p-3 space-y-3">
+              {orders.length === 0 ? (
+                <div className="text-center py-10 text-[#9CA3AF] text-[13px]">
+                  Aucune commande trouvée
+                </div>
+              ) : (
+                orders.map((o) => {
+                  const st = STATUS_CONFIG[o.status];
+                  const StIcon = st.icon;
+
+                  return (
+                    <article
+                      key={o.id}
+                      className="rounded-2xl border border-[#E5E7EB] dark:border-white/10 bg-[linear-gradient(135deg,rgba(255,107,53,0.05),rgba(59,130,246,0.03))] dark:bg-white/[0.02] p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p
+                            className="text-[#1A2332] dark:text-white truncate"
+                            style={{ fontWeight: 700 }}
+                          >
+                            {o.order_number}
+                          </p>
+                          <p className="text-[12px] text-[#6B7280] dark:text-white/60 truncate mt-0.5">
+                            {o.client}
+                          </p>
+                        </div>
+                        <span
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] shrink-0"
+                          style={{
+                            fontWeight: 600,
+                            backgroundColor: st.color + "15",
+                            color: st.color,
+                          }}
+                        >
+                          <StIcon className="w-3 h-3" />
+                          {st.label}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-3">
+                        <div className="rounded-xl bg-white/80 dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 px-3 py-2">
+                          <p className="text-[10px] text-[#9CA3AF]">Total</p>
+                          <p className="text-[13px] text-[#1A2332] dark:text-white" style={{ fontWeight: 700 }}>
+                            {formatPrice(o.total_ttc)}
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-white/80 dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 px-3 py-2">
+                          <p className="text-[10px] text-[#9CA3AF]">Articles</p>
+                          <p className="text-[13px] text-[#1A2332] dark:text-white" style={{ fontWeight: 700 }}>
+                            {o.items_count}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-3 mt-3 text-[11px] text-[#9CA3AF]">
+                        {o.city && (
+                          <span className="inline-flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {o.city}
+                          </span>
+                        )}
+                        {o.phone && (
+                          <span className="inline-flex items-center gap-1">
+                            <Phone className="w-3 h-3" />
+                            {o.phone}
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {formatShortDate(o.created_at)}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                        {o.items_preview.slice(0, 2).map((item, i) => (
+                          <span
+                            key={i}
+                            className="rounded-full border border-[#E5E7EB] dark:border-white/10 px-2 py-0.5 text-[10px] text-[#6B7280] dark:text-white/60"
+                          >
+                            {item.quantity}x {item.name}
+                          </span>
+                        ))}
+                        {o.items_count > o.items_preview.length && (
+                          <span className="text-[10px] text-[#9CA3AF]">
+                            +{o.items_count - o.items_preview.length} autre{o.items_count - o.items_preview.length > 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <p className="text-[11px] text-[#6B7280] dark:text-white/60">
+                          {o.payment_method === "cash_on_delivery" ? "Paiement: A la livraison" : `Paiement: ${o.payment_method}`}
+                        </p>
+                        <button
+                          onClick={() => openDetail(o.id)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] dark:border-white/10 px-3 py-1.5 text-[11px] text-[#6B7280] hover:text-[#FF6B35] hover:border-[#FF6B35] transition-colors"
+                          style={{ fontWeight: 600 }}
+                        >
+                          Voir détail <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead>
                   <tr className="border-b border-[#E5E7EB] dark:border-white/10 bg-[#F9FAFB] dark:bg-white/5">
@@ -500,42 +608,66 @@ export function AdminOrders() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-[#E5E7EB] dark:border-white/10">
-                <p className="text-[12px] text-[#9CA3AF]">
-                  Page {page} sur {totalPages}
-                </p>
-                <div className="flex gap-1">
+              <div className="px-4 py-3 border-t border-[#E5E7EB] dark:border-white/10">
+                <div className="flex items-center justify-between gap-2 md:hidden">
                   <button
                     disabled={page === 1}
                     onClick={() => setPage(page - 1)}
-                    className="w-8 h-8 rounded-lg border border-[#E5E7EB] dark:border-white/10 flex items-center justify-center text-[#9CA3AF] disabled:opacity-30"
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#E5E7EB] dark:border-white/10 px-3 py-1.5 text-[12px] text-[#6B7280] disabled:opacity-30"
+                    style={{ fontWeight: 600 }}
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-4 h-4" /> Précédent
                   </button>
-                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                    const p = i + 1;
-                    return (
-                      <button
-                        key={p}
-                        onClick={() => setPage(p)}
-                        className={`w-8 h-8 rounded-lg text-[12px] flex items-center justify-center ${
-                          page === p
-                            ? "bg-[#FF6B35] text-white"
-                            : "text-[#9CA3AF] hover:bg-[#F3F4F6] dark:hover:bg-white/10"
-                        }`}
-                        style={{ fontWeight: page === p ? 600 : 400 }}
-                      >
-                        {p}
-                      </button>
-                    );
-                  })}
+                  <p className="text-[12px] text-[#9CA3AF]">
+                    {page} / {totalPages}
+                  </p>
                   <button
                     disabled={page === totalPages}
                     onClick={() => setPage(page + 1)}
-                    className="w-8 h-8 rounded-lg border border-[#E5E7EB] dark:border-white/10 flex items-center justify-center text-[#9CA3AF] disabled:opacity-30"
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#E5E7EB] dark:border-white/10 px-3 py-1.5 text-[12px] text-[#6B7280] disabled:opacity-30"
+                    style={{ fontWeight: 600 }}
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    Suivant <ChevronRight className="w-4 h-4" />
                   </button>
+                </div>
+
+                <div className="hidden md:flex items-center justify-between">
+                  <p className="text-[12px] text-[#9CA3AF]">
+                    Page {page} sur {totalPages}
+                  </p>
+                  <div className="flex gap-1">
+                    <button
+                      disabled={page === 1}
+                      onClick={() => setPage(page - 1)}
+                      className="w-8 h-8 rounded-lg border border-[#E5E7EB] dark:border-white/10 flex items-center justify-center text-[#9CA3AF] disabled:opacity-30"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                      const p = i + 1;
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          className={`w-8 h-8 rounded-lg text-[12px] flex items-center justify-center ${
+                            page === p
+                              ? "bg-[#FF6B35] text-white"
+                              : "text-[#9CA3AF] hover:bg-[#F3F4F6] dark:hover:bg-white/10"
+                          }`}
+                          style={{ fontWeight: page === p ? 600 : 400 }}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                    <button
+                      disabled={page === totalPages}
+                      onClick={() => setPage(page + 1)}
+                      className="w-8 h-8 rounded-lg border border-[#E5E7EB] dark:border-white/10 flex items-center justify-center text-[#9CA3AF] disabled:opacity-30"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

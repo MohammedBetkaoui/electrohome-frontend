@@ -18,6 +18,8 @@ interface CatalogProductResponse {
   energy?: string | null;
   specs?: string | null;
   description?: string | null;
+  rating?: number | null;
+  reviewCount?: number | null;
   createdAt?: string | null;
 }
 
@@ -109,8 +111,8 @@ function mapCatalogProduct(product: CatalogProductResponse): Product {
     stock: Number(product.stock) || 0,
     image,
     images,
-    rating: 0,
-    reviewCount: 0,
+    rating: Number(product.rating ?? 0),
+    reviewCount: Number(product.reviewCount ?? 0),
     badge: getBadge(product),
     category: product.categorySlug || "catalogue",
     specs: product.specs || product.energy || "Produit disponible",

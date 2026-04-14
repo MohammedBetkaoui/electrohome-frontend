@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, Package, Heart, MapPin, MessageSquare, Settings, LogOut, Truck, ReceiptText, RotateCcw } from "lucide-react";
+import { LayoutDashboard, Package, Heart, MapPin, MessageSquare, Settings, LogOut, Truck, ReceiptText, RotateCcw, Star, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { cancelMyOrder, getCheckoutAddresses, getMyOrder, getMyOrders, type CustomerOrder, type CustomerOrderDetail, type ShippingAddress } from "../api/orders";
+import { deleteMyReview, getMyReviews, type MyReview, type ReviewStatus as CustomerReviewStatus } from "../api/reviews";
 import { createReturn, getMyReturn, getMyReturns, getReturnReasons, type CustomerReturnDetail, type CustomerReturnSummary, type ReturnReason, type ReturnStatus } from "../api/returns";
 import { PRODUCTS, formatPrice, useStore } from "../data/store";
 import { ProductCard } from "../components/ProductCard";
@@ -40,12 +41,23 @@ const returnStatusMap: Record<ReturnStatus, { label: string; className: string }
   rejected: { label: "Rejeté", className: "text-rose-500" },
 };
 
+const reviewStatusMap: Record<CustomerReviewStatus, { label: string; className: string }> = {
+  pending: { label: "En attente", className: "text-amber-500" },
+  approved: { label: "Approuve", className: "text-emerald-500" },
+  rejected: { label: "Rejete", className: "text-rose-500" },
+  flagged: { label: "Signale", className: "text-violet-500" },
+};
+
 function formatOrderStatus(status: string) {
   return orderStatusMap[status] || { label: status, className: "text-muted-foreground" };
 }
 
 function formatReturnStatus(status: ReturnStatus) {
   return returnStatusMap[status] || { label: status, className: "text-muted-foreground" };
+}
+
+function formatReviewStatus(status: CustomerReviewStatus) {
+  return reviewStatusMap[status] || { label: status, className: "text-muted-foreground" };
 }
 
 function formatOrderDate(value: string) {
@@ -222,6 +234,9 @@ export function AccountPage() {
   const [returnDetailLoading, setReturnDetailLoading] = useState(false);
   const [returnDraft, setReturnDraft] = useState<ReturnDraft | null>(null);
   const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [reviews, setReviews] = useState<MyReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [deletingReviewId, setDeletingReviewId] = useState<number | null>(null);
   const { favorites } = useStore();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -303,6 +318,47 @@ export function AccountPage() {
       if (!silent) {
         setReturnsLoading(false);
       }
+    }
+  };
+
+  const loadReviews = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) {
+      setReviewsLoading(true);
+    }
+
+    try {
+      const data = await getMyReviews({
+        status: "all",
+        perPage: 30,
+      });
+      setReviews(data.data);
+    } catch {
+      if (!silent) {
+        toast.error("Impossible de charger vos avis.");
+      }
+    } finally {
+      if (!silent) {
+        setReviewsLoading(false);
+      }
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: number) => {
+    const confirmed = window.confirm("Voulez-vous supprimer cet avis ?");
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingReviewId(reviewId);
+
+    try {
+      await deleteMyReview(reviewId);
+      toast.success("Avis supprime.");
+      await loadReviews({ silent: true });
+    } catch {
+      toast.error("Impossible de supprimer cet avis.");
+    } finally {
+      setDeletingReviewId(null);
     }
   };
 
@@ -431,6 +487,7 @@ export function AccountPage() {
     void loadOrders();
     void loadAddresses();
     void loadReturns();
+    void loadReviews();
   }, []);
 
   useEffect(() => {
@@ -838,7 +895,70 @@ export function AccountPage() {
           {active === "reviews" && (
             <div>
               <h2 className="text-xl mb-6" style={{ fontWeight: 600 }}>Mes avis</h2>
-              <p className="text-muted-foreground text-sm">Vous n&apos;avez pas encore laissé d&apos;avis.</p>
+
+              {reviewsLoading ? (
+                <p className="text-muted-foreground text-sm">Chargement de vos avis...</p>
+              ) : reviews.length === 0 ? (
+                <p className="text-muted-foreground text-sm">Vous n&apos;avez pas encore laisse d&apos;avis.</p>
+              ) : (
+                <div className="space-y-3">
+                  {reviews.map((review) => {
+                    const status = formatReviewStatus(review.status);
+
+                    return (
+                      <article key={review.id} className="p-4 rounded-xl border border-border bg-card space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm" style={{ fontWeight: 600 }}>{review.product.name || "Produit"}</p>
+                            <p className={`text-xs ${status.className}`} style={{ fontWeight: 500 }}>{status.label}</p>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: 5 }).map((_, index) => (
+                              <Star
+                                key={index}
+                                className={`w-4 h-4 ${index < review.rating ? "fill-[#FFD60A] text-[#FFD60A]" : "text-border"}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          {review.title && (
+                            <p className="text-sm" style={{ fontWeight: 600 }}>{review.title}</p>
+                          )}
+                          <p className="text-sm text-muted-foreground mt-1">{review.comment || "-"}</p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs text-muted-foreground">
+                            {review.updatedAt ? `Maj: ${formatOrderDate(review.updatedAt)}` : ""}
+                          </p>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                const target = review.product.slug || String(review.productId);
+                                navigate(`/produit/${target}`);
+                              }}
+                              className="px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted"
+                            >
+                              Modifier
+                            </button>
+                            <button
+                              onClick={() => handleDeleteReview(review.id)}
+                              disabled={deletingReviewId === review.id}
+                              className="px-3 py-1.5 rounded-lg border border-destructive text-destructive text-xs hover:bg-destructive/10 disabled:opacity-60 inline-flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Supprimer
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>

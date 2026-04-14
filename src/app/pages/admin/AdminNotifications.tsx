@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { ShoppingCart, Users, RefreshCw, Trash2, Boxes } from "lucide-react";
+import { ShoppingCart, Users, RefreshCw, Trash2, Boxes, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
   getAdminNotifications,
@@ -20,6 +20,7 @@ const TYPE_CFG: Record<NotifType, { label: string; color: string; icon: any }> =
   order: { label: "Commande", color: "#FF6B35", icon: ShoppingCart },
   client: { label: "Client", color: "#8B5CF6", icon: Users },
   inventory: { label: "Inventaire", color: "#F59E0B", icon: Boxes },
+  review: { label: "Avis", color: "#0EA5E9", icon: MessageCircle },
 };
 
 function timeAgo(date: string) {
@@ -32,7 +33,7 @@ function timeAgo(date: string) {
 }
 
 function normalizeTypeFilter(value: string | null): NotifType | "all" {
-  if (value === "order" || value === "client" || value === "inventory") {
+  if (value === "order" || value === "client" || value === "inventory" || value === "review") {
     return value;
   }
 
@@ -280,6 +281,21 @@ export function AdminNotifications() {
                     style={{ fontWeight: 600 }}
                   >
                     Ouvrir la page Inventaire
+                  </Link>
+                )}
+                {n.type === "review" && (
+                  <Link
+                    to={(() => {
+                      const reviewId = Number(n.payload?.review_id ?? 0);
+                      if (reviewId > 0) {
+                        return `/admin/avis?focus=${reviewId}`;
+                      }
+                      return "/admin/avis";
+                    })()}
+                    className="inline-flex mt-1 text-[11px] text-[#0EA5E9] hover:underline"
+                    style={{ fontWeight: 600 }}
+                  >
+                    Ouvrir la moderation des avis
                   </Link>
                 )}
                 <p className="text-[11px] text-[#9CA3AF] mt-1">{timeAgo(n.date)}</p>

@@ -13,7 +13,8 @@ export function AdminTopbar({ title }: { title: string }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadPreview, setUnreadPreview] = useState<AdminNotification[]>([]);
   const [inventoryUnreadCount, setInventoryUnreadCount] = useState(0);
-  const [previewTypeFilter, setPreviewTypeFilter] = useState<"all" | "inventory">("all");
+  const [previewTypeFilter, setPreviewTypeFilter] = useState<"all" | "inventory" | "review">("all");
+  const [reviewUnreadCount, setReviewUnreadCount] = useState(0);
   const [notifOpen, setNotifOpen] = useState(false);
   const channelBoundRef = useRef(false);
   const notifMenuRef = useRef<HTMLDivElement | null>(null);
@@ -31,6 +32,7 @@ export function AdminTopbar({ title }: { title: string }) {
       setUnreadCount(res.meta.unreadCount ?? 0);
       setUnreadPreview(unreadItems.slice(0, 12));
       setInventoryUnreadCount(unreadItems.filter((n) => n.type === "inventory").length);
+      setReviewUnreadCount(unreadItems.filter((n) => n.type === "review").length);
       knownNotificationIdsRef.current = new Set(res.data.map((item) => item.id));
       hasLoadedOnceRef.current = true;
 
@@ -79,6 +81,9 @@ export function AdminTopbar({ title }: { title: string }) {
       if (_event.type === "inventory") {
         setInventoryUnreadCount((prev) => prev + 1);
       }
+      if (_event.type === "review") {
+        setReviewUnreadCount((prev) => prev + 1);
+      }
       setUnreadPreview((prev) => [
         { ..._event, read: false },
         ...prev.filter((n) => n.id !== _event.id),
@@ -114,12 +119,31 @@ export function AdminTopbar({ title }: { title: string }) {
       return unreadPreview.filter((item) => item.type === "inventory").slice(0, 5);
     }
 
+    if (previewTypeFilter === "review") {
+      return unreadPreview.filter((item) => item.type === "review").slice(0, 5);
+    }
+
     return unreadPreview.slice(0, 5);
   }, [previewTypeFilter, unreadPreview]);
 
   const notificationsPageLink = previewTypeFilter === "inventory"
     ? "/admin/notifications?type=inventory"
-    : "/admin/notifications";
+    : previewTypeFilter === "review"
+      ? "/admin/notifications?type=review"
+      : "/admin/notifications";
+
+  const getNotificationTarget = (item: AdminNotification) => {
+    if (item.type === "inventory") {
+      return "/admin/notifications?type=inventory";
+    }
+
+    if (item.type === "review") {
+      const reviewId = Number(item.payload?.review_id ?? 0);
+      return reviewId > 0 ? `/admin/avis?focus=${reviewId}` : "/admin/notifications?type=review";
+    }
+
+    return "/admin/notifications";
+  };
 
   return (
     <header
@@ -207,6 +231,17 @@ export function AdminTopbar({ title }: { title: string }) {
                   >
                     Inventaire ({inventoryUnreadCount})
                   </button>
+                  <button
+                    onClick={() => setPreviewTypeFilter("review")}
+                    className={`px-2.5 py-1 rounded-md text-[11px] transition-colors ${
+                      previewTypeFilter === "review"
+                        ? "bg-[#0EA5E9] text-white"
+                        : "bg-[#F3F4F6] dark:bg-white/5 text-[#6B7280] dark:text-white/60"
+                    }`}
+                    style={{ fontWeight: 600 }}
+                  >
+                    Avis ({reviewUnreadCount})
+                  </button>
                 </div>
               </div>
 
@@ -215,13 +250,15 @@ export function AdminTopbar({ title }: { title: string }) {
                   <div className="px-4 py-6 text-[12px] text-[#9CA3AF] text-center">
                     {previewTypeFilter === "inventory"
                       ? "Aucune alerte inventaire non lue"
-                      : "Aucune notification non lue"}
+                      : previewTypeFilter === "review"
+                        ? "Aucun avis en attente/non lu"
+                        : "Aucune notification non lue"}
                   </div>
                 ) : (
                   previewItems.map((item) => (
                     <Link
                       key={item.id}
-                      to={item.type === "inventory" ? "/admin/notifications?type=inventory" : "/admin/notifications"}
+                      to={getNotificationTarget(item)}
                       onClick={() => setNotifOpen(false)}
                       className="block px-4 py-3 border-b border-[#E5E7EB]/60 dark:border-white/5 hover:bg-[#F9FAFB] dark:hover:bg-white/5 transition-colors"
                     >
@@ -245,7 +282,9 @@ export function AdminTopbar({ title }: { title: string }) {
                 >
                   {previewTypeFilter === "inventory"
                     ? "Voir les alertes inventaire"
-                    : "Voir la page des notifications"}
+                    : previewTypeFilter === "review"
+                      ? "Voir les notifications avis"
+                      : "Voir la page des notifications"}
                 </Link>
               </div>
             </div>
