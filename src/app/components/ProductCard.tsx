@@ -2,6 +2,7 @@ import { Heart, ShoppingCart, Star } from "lucide-react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { Product, useStore, formatPrice } from "../data/store";
+import { getPromotionDiscountPercent, hasActivePromotion } from "../lib/promotions";
 
 const badgeColors: Record<string, string> = {
   Nouveau: "bg-[#0A84FF] text-white",
@@ -12,7 +13,8 @@ const badgeColors: Record<string, string> = {
 export function ProductCard({ product }: { product: Product }) {
   const { addToCart, favorites, toggleFavorite } = useStore();
   const isFav = favorites.includes(product.id);
-  const discount = product.oldPrice ? Math.round((1 - product.price / product.oldPrice) * 100) : 0;
+  const hasPromotion = hasActivePromotion(product);
+  const discount = getPromotionDiscountPercent(product);
   const productPath = `/produit/${product.slug ?? product.id}`;
   const stock = typeof product.stock === "number" ? Math.max(0, Math.floor(product.stock)) : null;
   const isOutOfStock = stock !== null && stock <= 0;
@@ -71,7 +73,7 @@ export function ProductCard({ product }: { product: Product }) {
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-baseline gap-2">
             <span className="text-lg text-foreground" style={{ fontWeight: 600 }}>{formatPrice(product.price)}</span>
-            {product.oldPrice && <span className="text-sm text-muted-foreground line-through">{formatPrice(product.oldPrice)}</span>}
+            {hasPromotion && product.oldPrice && <span className="text-sm text-muted-foreground line-through">{formatPrice(product.oldPrice)}</span>}
           </div>
           <button
             onClick={handleAddToCart}

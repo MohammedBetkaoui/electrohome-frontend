@@ -10,8 +10,10 @@ import {
   AdminProduct,
   BrandRef,
   CategoryRef,
+  createProduct,
   getProducts,
   getReferences,
+  updateProduct,
   deleteProduct
 } from "../../api/adminProducts";
 

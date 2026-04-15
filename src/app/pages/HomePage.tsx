@@ -8,6 +8,7 @@ import { getCatalogProducts } from "../api/products";
 import { ProductCard } from "../components/ProductCard";
 import { Skeleton } from "../components/ui/skeleton";
 import type { Product } from "../data/store";
+import { hasActivePromotion } from "../lib/promotions";
 
 function CountdownTimer() {
   const [time, setTime] = useState({ h: 2, m: 14, s: 36 });
@@ -148,7 +149,7 @@ export function HomePage() {
     };
   }, []);
 
-  const flashProducts = featuredProducts.filter((product) => product.oldPrice).slice(0, 3);
+  const flashProducts = featuredProducts.filter((product) => hasActivePromotion(product)).slice(0, 3);
   const firstCategorySlug = categories[0]?.slug || "refrigerateurs";
 
   const handleFlashAddToCart = (product: Product) => {

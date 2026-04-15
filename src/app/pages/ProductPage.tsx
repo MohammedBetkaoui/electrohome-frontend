@@ -21,6 +21,7 @@ import { PRODUCTS, formatPrice, useStore } from "../data/store";
 import { useAuth } from "../context/AuthContext";
 import { Skeleton } from "../components/ui/skeleton";
 import type { Product } from "../data/store";
+import { getPromotionDiscountPercent, hasActivePromotion } from "../lib/promotions";
 
 function ProductPageSkeleton() {
   return (
@@ -286,7 +287,8 @@ export function ProductPage() {
   }
 
   const isFav = favorites.includes(product.id);
-  const discount = product.oldPrice ? Math.round((1 - product.price / product.oldPrice) * 100) : 0;
+  const hasPromotion = hasActivePromotion(product);
+  const discount = getPromotionDiscountPercent(product);
   const productImages = product.images?.length ? product.images : [product.image];
   const currentImage = productImages[selectedImage] || product.image;
   const specsList = product.specs.split(", ").filter(Boolean);
@@ -481,7 +483,7 @@ export function ProductPage() {
 
           <div className="flex items-baseline gap-3">
             <span className="text-3xl text-foreground" style={{ fontWeight: 700 }}>{formatPrice(product.price)}</span>
-            {product.oldPrice && (
+            {hasPromotion && product.oldPrice && (
               <>
                 <span className="text-lg text-muted-foreground line-through">{formatPrice(product.oldPrice)}</span>
                 <span className="px-2 py-0.5 rounded bg-[#E8400C] text-white text-xs" style={{ fontWeight: 600 }}>
