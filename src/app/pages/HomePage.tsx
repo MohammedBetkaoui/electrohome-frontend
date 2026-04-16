@@ -4,10 +4,13 @@ import { Truck, Shield, Headphones, Award, ChevronRight, ArrowRight, Timer } fro
 import { toast } from "sonner";
 import { BRANDS, IMAGES, formatPrice, useStore } from "../data/store";
 import { getCatalogCategories, type CatalogCategory } from "../api/categories";
+import { getCatalogBlogPosts } from "../api/blog";
 import { getCatalogProducts } from "../api/products";
 import { ProductCard } from "../components/ProductCard";
 import { Skeleton } from "../components/ui/skeleton";
 import type { Product } from "../data/store";
+import type { BlogPost } from "../lib/blog";
+import { formatBlogReadTime } from "../lib/blog";
 import { hasActivePromotion } from "../lib/promotions";
 
 function CountdownTimer() {
@@ -94,6 +97,9 @@ export function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState("");
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [blogLoading, setBlogLoading] = useState(true);
+  const [blogError, setBlogError] = useState("");
 
   useEffect(() => {
     let ignore = false;
@@ -114,6 +120,33 @@ export function HomePage() {
       .finally(() => {
         if (!ignore) {
           setCategoriesLoading(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    setBlogLoading(true);
+
+    getCatalogBlogPosts({ limit: 3 })
+      .then((posts) => {
+        if (ignore) return;
+        setBlogPosts(posts);
+        setBlogError("");
+      })
+      .catch((error) => {
+        if (ignore) return;
+        setBlogPosts([]);
+        setBlogError(error instanceof Error ? error.message : "Impossible de charger les articles du blog.");
+      })
+      .finally(() => {
+        if (!ignore) {
+          setBlogLoading(false);
         }
       });
 
@@ -345,26 +378,42 @@ export function HomePage() {
             Tout voir <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            { img: IMAGES.blog1, tag: "Guide d'achat", title: "Comment choisir son refrigerateur en 2026", time: "5 min" },
-            { img: IMAGES.blog2, tag: "Entretien", title: "10 astuces pour entretenir votre lave-linge", time: "3 min" },
-            { img: IMAGES.blog3, tag: "Tendances", title: "Electromenager eco-responsable : le guide complet", time: "7 min" },
-          ].map((article) => (
-            <Link key={article.title} to="/blog" className="group rounded-xl overflow-hidden bg-card border border-border">
-              <div className="aspect-[16/10] overflow-hidden">
-                <img src={article.img} alt={article.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+
+        {blogLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="rounded-xl border border-border overflow-hidden bg-card">
+                <Skeleton className="aspect-[16/10] w-full rounded-none" />
+                <div className="p-5 space-y-2">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
               </div>
-              <div className="p-5">
-                <span className="text-xs text-[#0A84FF] dark:text-[#2997FF]" style={{ fontWeight: 500 }}>{article.tag}</span>
-                <h3 className="text-sm mt-1 mb-2 group-hover:text-[#E8400C] transition-colors" style={{ fontWeight: 500 }}>
-                  {article.title}
-                </h3>
-                <p className="text-xs text-muted-foreground">{article.time} de lecture</p>
-              </div>
-            </Link>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : blogPosts.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {blogPosts.map((post) => (
+              <Link key={post.id} to={`/blog/${post.slug || post.id}`} className="group rounded-xl overflow-hidden bg-card border border-border">
+                <div className="aspect-[16/10] overflow-hidden">
+                  <img src={post.image} alt={post.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                </div>
+                <div className="p-5">
+                  <span className="text-xs text-[#0A84FF] dark:text-[#2997FF]" style={{ fontWeight: 500 }}>{post.category}</span>
+                  <h3 className="text-sm mt-1 mb-2 group-hover:text-[#E8400C] transition-colors" style={{ fontWeight: 500 }}>
+                    {post.title}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">{formatBlogReadTime(post.readTime)} de lecture</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+            {blogError || "Aucun article de blog n'est disponible pour le moment."}
+          </div>
+        )}
       </section>
 
       <section className="bg-[#1A1A2E] text-white">
