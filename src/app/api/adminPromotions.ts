@@ -28,7 +28,8 @@ type PromotionPatch = {
 
 function buildProductFormData(product: AdminProduct, patch: PromotionPatch = {}): FormData {
   const nextPrice = patch.price ?? product.price;
-  const nextOldPrice = patch.oldPrice === undefined ? product.oldPrice ?? null : patch.oldPrice;
+  const hasOldPricePatch = Object.prototype.hasOwnProperty.call(patch, "oldPrice");
+  const nextOldPrice = hasOldPricePatch ? (patch.oldPrice ?? null) : (product.oldPrice ?? null);
   const nextStatus = patch.status ?? product.status;
   const data = new FormData();
 
@@ -45,6 +46,9 @@ function buildProductFormData(product: AdminProduct, patch: PromotionPatch = {})
 
   if (typeof nextOldPrice === "number" && Number.isFinite(nextOldPrice) && nextOldPrice > 0) {
     data.append("oldPrice", String(nextOldPrice));
+  } else if (nextOldPrice === null) {
+    // Explicitly clear old_price in backend when removing a promotion.
+    data.append("oldPrice", "");
   }
 
   return data;
@@ -84,9 +88,15 @@ export async function saveAdminPromotion(
 }
 
 export async function removeAdminPromotion(product: AdminProduct): Promise<void> {
+  const restoredPrice =
+    typeof product.oldPrice === "number" && Number.isFinite(product.oldPrice) && product.oldPrice > 0
+      ? product.oldPrice
+      : product.price;
+
   await updateProduct(
     product.id,
     buildProductFormData(product, {
+      price: restoredPrice,
       oldPrice: null,
     }),
   );

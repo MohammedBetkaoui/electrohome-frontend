@@ -1,8 +1,8 @@
 import { NavLink } from "react-router";
 import {
   LayoutDashboard, Package, ShoppingCart, RotateCcw, Users,
-  FileText, Headphones, Settings, ChevronLeft, ChevronRight, LogOut, X,
-  BarChart3, Boxes, Star, Grid3X3, ClipboardList,
+  FileText, Settings, ChevronLeft, ChevronRight, LogOut, X,
+  BarChart3, Boxes, Star, Grid3X3,
   Bell, Flame
 } from "lucide-react";
 import { useSidebar } from "./AdminLayout";
@@ -37,9 +37,7 @@ const NAV_SECTIONS = [
   {
     label: "Système",
     items: [
-      { to: "/admin/support", icon: Headphones, label: "Support" },
       { to: "/admin/notifications", icon: Bell, label: "Notifications" },
-      { to: "/admin/rapports", icon: ClipboardList, label: "Rapports" },
       { to: "/admin/parametres", icon: Settings, label: "Paramètres" },
     ],
   },

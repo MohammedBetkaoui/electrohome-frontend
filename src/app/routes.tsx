@@ -24,13 +24,11 @@ import { AdminOrderDetail } from "./pages/admin/AdminOrderDetail";
 import { AdminClients } from "./pages/admin/AdminClients";
 import { AdminReturns } from "./pages/admin/AdminReturns";
 import { AdminBlog } from "./pages/admin/AdminBlog";
-import { AdminSupport } from "./pages/admin/AdminSupport";
 import { AdminSettings } from "./pages/admin/AdminSettings";
 import { AdminAnalytics } from "./pages/admin/AdminAnalytics";
 import { AdminInventory } from "./pages/admin/AdminInventory";
 import { AdminReviews } from "./pages/admin/AdminReviews";
 import { AdminCategories } from "./pages/admin/AdminCategories";
-import { AdminReports } from "./pages/admin/AdminReports";
 import { AdminNotifications } from "./pages/admin/AdminNotifications";
 import { AdminPromotions } from "./pages/admin/AdminPromotions";
 
@@ -112,9 +110,7 @@ export const router = createBrowserRouter([
       { path: "promotions", Component: AdminPromotions },
       { path: "avis", Component: AdminReviews },
       { path: "blog", Component: AdminBlog },
-      { path: "support", Component: AdminSupport },
       { path: "notifications", Component: AdminNotifications },
-      { path: "rapports", Component: AdminReports },
       { path: "parametres", Component: AdminSettings },
     ],
   },

@@ -398,7 +398,7 @@ function RemovePromotionModal({
             </h3>
             <p className="text-[13px] text-[#6B7280] dark:text-white/55 mt-2">
               Le badge promo disparaitra de la boutique pour <span style={{ fontWeight: 700 }}>{product.name}</span>.
-              Le prix actuel sera conserve.
+              Le prix sera remis a l'ancien prix et le prix promo sera supprime.
             </p>
           </div>
           <div className="rounded-xl bg-[#F9FAFB] dark:bg-white/5 p-4 text-[12px] space-y-2 border border-[#E5E7EB] dark:border-white/10">
