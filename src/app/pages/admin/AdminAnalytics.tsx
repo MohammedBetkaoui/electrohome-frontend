@@ -30,6 +30,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  exportAdminAnalyticsPdf,
   getAdminAnalytics,
   type AdminAnalyticsData,
   type AnalyticsPeriod,
@@ -161,6 +162,7 @@ export function AdminAnalytics() {
   const [analytics, setAnalytics] = useState<AdminAnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadAnalytics = async (selectedPeriod: AnalyticsPeriod, refresh = false) => {
@@ -187,6 +189,27 @@ export function AdminAnalytics() {
   useEffect(() => {
     void loadAnalytics(period);
   }, [period]);
+
+  const handleExportPdf = async () => {
+    try {
+      setIsExporting(true);
+      const file = await exportAdminAnalyticsPdf(period);
+      const url = window.URL.createObjectURL(file.blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = file.fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Impossible d'exporter le PDF.";
+      toast.error(message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const kpis = useMemo(() => {
     if (!analytics) return [];
@@ -272,11 +295,12 @@ export function AdminAnalytics() {
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} /> Actualiser
           </button>
           <button
-            onClick={() => window.print()}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#6B7280] hover:border-[#FF6B35] hover:text-[#FF6B35]"
+            onClick={() => void handleExportPdf()}
+            disabled={isExporting}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#6B7280] hover:border-[#FF6B35] hover:text-[#FF6B35] disabled:opacity-60"
             style={{ fontWeight: 500 }}
           >
-            <Download className="w-4 h-4" /> Exporter PDF
+            <Download className="w-4 h-4" /> {isExporting ? "Generation..." : "Exporter PDF"}
           </button>
         </div>
       </div>

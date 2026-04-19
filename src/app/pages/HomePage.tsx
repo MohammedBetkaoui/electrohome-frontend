@@ -203,30 +203,94 @@ export function HomePage() {
 
   return (
     <div>
-      <section className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #1A1A2E 0%, #16213E 100%)" }}>
-        <div className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-20 py-16 md:py-24 flex flex-col md:flex-row items-center gap-8">
-          <div className="flex-1 text-white z-10">
-            <span className="inline-block px-3 py-1 rounded-full bg-white/10 text-xs mb-4 backdrop-blur">Nouveau catalogue 2026</span>
-            <h1 className="text-3xl md:text-5xl mb-4" style={{ fontWeight: 700, lineHeight: 1.15 }}>
-              L&apos;electromenager qui
+      <section className="relative overflow-hidden min-h-[600px] md:min-h-[680px]" style={{ background: "linear-gradient(135deg, #0f0f1a 0%, #1A1A2E 40%, #16213E 100%)" }}>
+        {/* Decorative elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full opacity-[0.07]" style={{ background: "radial-gradient(circle, #E8400C 0%, transparent 70%)" }} />
+          <div className="absolute bottom-0 left-0 w-72 h-72 rounded-full opacity-[0.05]" style={{ background: "radial-gradient(circle, #E8400C 0%, transparent 70%)" }} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.03]" style={{ background: "radial-gradient(circle, #fff 0%, transparent 60%)" }} />
+          {/* Grid pattern */}
+          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+        </div>
+
+        <div className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-20 py-16 md:py-24 flex flex-col lg:flex-row items-center gap-10 lg:gap-16 relative z-10">
+          {/* Left content */}
+          <div className="flex-1 text-white">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.08] border border-white/[0.08] text-xs mb-6 backdrop-blur-sm">
+              <span className="w-2 h-2 rounded-full bg-[#E8400C] animate-pulse" />
+              Nouveau catalogue 2026
+            </div>
+            <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] mb-6 tracking-tight" style={{ fontWeight: 800, lineHeight: 1.1 }}>
+              Équipez votre maison
               <br />
-              vous <span className="text-[#E8400C]">ressemble</span>
+              avec l&apos;<span className="relative inline-block">
+                <span className="relative z-10 text-transparent bg-clip-text" style={{ backgroundImage: "linear-gradient(135deg, #E8400C 0%, #FF6B3D 100%)" }}>excellence</span>
+                <span className="absolute bottom-1 left-0 w-full h-3 bg-[#E8400C]/20 rounded-sm -z-0" />
+              </span>
             </h1>
-            <p className="text-white/70 mb-8 max-w-lg">
-              Decouvrez notre selection premium d&apos;appareils pour votre maison. Livraison gratuite, garantie et
-              conseils d&apos;experts.
+            <p className="text-white/60 mb-8 max-w-lg text-base leading-relaxed">
+              Réfrigérateurs, machines à laver, fours et bien plus — découvrez les meilleures marques d&apos;électroménager avec livraison gratuite, installation offerte et garantie étendue.
             </p>
-            <div className="flex flex-wrap gap-3">
-              <Link to="/categorie/refrigerateurs" className="px-6 py-3 rounded-lg bg-[#E8400C] text-white text-sm hover:opacity-90 transition-opacity inline-flex items-center gap-2">
-                Explorer le catalogue <ArrowRight className="w-4 h-4" />
+            <div className="flex flex-wrap gap-3 mb-10">
+              <Link to="/categorie/refrigerateurs" className="group px-7 py-3.5 rounded-xl bg-[#E8400C] text-white text-sm hover:bg-[#d63a0a] transition-all inline-flex items-center gap-2 shadow-lg shadow-[#E8400C]/25" style={{ fontWeight: 600 }}>
+                Explorer le catalogue <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </Link>
-              <Link to="/blog" className="px-6 py-3 rounded-lg border border-white/20 text-white text-sm hover:bg-white/10 transition-colors">
+              <Link to="/blog" className="px-7 py-3.5 rounded-xl border border-white/15 text-white text-sm hover:bg-white/[0.06] transition-all backdrop-blur-sm" style={{ fontWeight: 500 }}>
                 Nos conseils d&apos;experts
               </Link>
             </div>
+
+            {/* Trust stats */}
+            <div className="flex flex-wrap gap-6 md:gap-10">
+              {[
+                { value: "5 000+", label: "Références" },
+                { value: "50+", label: "Marques" },
+                { value: "4.8/5", label: "Satisfaction" },
+              ].map((stat) => (
+                <div key={stat.label}>
+                  <p className="text-xl md:text-2xl text-white" style={{ fontWeight: 700 }}>{stat.value}</p>
+                  <p className="text-xs text-white/40 mt-0.5">{stat.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex-1 relative">
-            <img src={IMAGES.kitchen} alt="Kitchen" className="w-full max-w-lg rounded-2xl shadow-2xl" />
+
+          {/* Right visual */}
+          <div className="flex-1 relative w-full max-w-xl lg:max-w-none">
+            <div className="relative">
+              {/* Main image */}
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/40 border border-white/[0.06]">
+                <img src={IMAGES.kitchen} alt="Cuisine moderne équipée" className="w-full aspect-[4/3] object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f1a]/60 via-transparent to-transparent" />
+              </div>
+
+              {/* Floating appliance cards */}
+              <div className="hidden md:flex absolute -left-8 top-8 flex-col gap-3 animate-[float_6s_ease-in-out_infinite]">
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-xl border border-white/10 shadow-xl">
+                  <img src={IMAGES.fridge} alt="Réfrigérateur" className="w-10 h-10 rounded-lg object-cover" />
+                  <div>
+                    <p className="text-white text-xs" style={{ fontWeight: 600 }}>Réfrigérateurs</p>
+                    <p className="text-white/40 text-[10px]">Dès 45 000 DA</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="hidden md:flex absolute -right-6 bottom-16 flex-col gap-3 animate-[float_6s_ease-in-out_infinite_1s]">
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.08] backdrop-blur-xl border border-white/10 shadow-xl">
+                  <img src={IMAGES.washer} alt="Machine à laver" className="w-10 h-10 rounded-lg object-cover" />
+                  <div>
+                    <p className="text-white text-xs" style={{ fontWeight: 600 }}>Machines à laver</p>
+                    <p className="text-white/40 text-[10px]">Dès 35 000 DA</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Promo badge */}
+              <div className="absolute -right-3 -top-3 md:right-4 md:top-4 px-3 py-2 rounded-xl bg-[#E8400C] text-white shadow-lg shadow-[#E8400C]/30 animate-[float_5s_ease-in-out_infinite_0.5s]">
+                <p className="text-[10px] uppercase tracking-wider opacity-80" style={{ fontWeight: 500 }}>Jusqu&apos;à</p>
+                <p className="text-xl" style={{ fontWeight: 800 }}>-40%</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -437,6 +501,10 @@ export function HomePage() {
         @keyframes scroll {
           from { transform: translateX(0); }
           to { transform: translateX(-33.333%); }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
         }
       `}</style>
     </div>

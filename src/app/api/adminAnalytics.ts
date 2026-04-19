@@ -111,6 +111,11 @@ export interface AdminAnalyticsData {
   topCities: TopCityPoint[];
 }
 
+export interface DownloadedAdminFile {
+  blob: Blob;
+  fileName: string;
+}
+
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   const token = getToken();
   const headers = new Headers(options.headers || {});
@@ -148,4 +153,53 @@ export async function getAdminDashboard(): Promise<AdminDashboardData> {
 export async function getAdminAnalytics(period: AnalyticsPeriod): Promise<AdminAnalyticsData> {
   const response = await fetchWithAuth(`/analytics?period=${period}`);
   return response.data;
+}
+
+function getDownloadedFileName(response: Response, fallback: string) {
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+
+  if (utfMatch?.[1]) {
+    return decodeURIComponent(utfMatch[1]);
+  }
+
+  const basicMatch = disposition.match(/filename="?([^";]+)"?/i);
+
+  if (basicMatch?.[1]) {
+    return basicMatch[1];
+  }
+
+  return fallback;
+}
+
+export async function exportAdminAnalyticsPdf(period: AnalyticsPeriod): Promise<DownloadedAdminFile> {
+  const token = getToken();
+  const headers = new Headers({ Accept: "application/pdf" });
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_URL}/analytics/export/pdf?period=${period}`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    let message = "Une erreur est survenue";
+
+    try {
+      const errorData = await response.json();
+      message = errorData?.message || errorData?.error || message;
+    } catch {
+      message = response.statusText || message;
+    }
+
+    throw new Error(message);
+  }
+
+  return {
+    blob: await response.blob(),
+    fileName: getDownloadedFileName(response, `analytics-${period}j.pdf`),
+  };
 }

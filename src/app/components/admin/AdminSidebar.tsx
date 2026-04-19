@@ -73,16 +73,30 @@ export function AdminSidebar() {
         style={{ fontFamily: "'Sora', sans-serif" }}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-5 h-16 border-b border-white/10 shrink-0">
-          <div className="flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="ElectroHome"
-              className="w-27 h-27 object-contain shrink-0 items-center justify-center"
-              loading="lazy"
-            />
-           
-          </div>
+        <div className={`flex items-center justify-between h-16 border-b border-white/10 shrink-0 ${showLabels ? "px-5" : "px-3"}`}>
+          <NavLink
+            to="/admin"
+            end
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center transition-all duration-300 ${showLabels ? "gap-3" : "w-full justify-center"}`}
+            aria-label="Retour au dashboard admin"
+          >
+            {showLabels ? (
+              <img
+                src="/logo.png"
+                alt="ElectroHome"
+                className="h-11 w-auto max-w-[170px] object-contain shrink-0"
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,107,53,0.14))] shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
+                <span className="text-[13px] tracking-[0.14em] text-[#EED6B4]" style={{ fontWeight: 800 }}>
+                  EH
+                </span>
+              </div>
+            )}
+          </NavLink>
+
           {/* Close button (mobile only) */}
           <button
             onClick={() => setMobileOpen(false)}

@@ -21,6 +21,7 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (user: AuthUser, token: string) => void;
+  syncUser: (user: AuthUser) => void;
   logout: () => Promise<void>;
 }
 
@@ -63,6 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
   }, []);
 
+  const syncUser = useCallback((userData: AuthUser) => {
+    setUser(userData);
+  }, []);
+
   // Déconnexion
   const logout = useCallback(async () => {
     if (token) {
@@ -81,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         login,
+        syncUser,
         logout,
       }}
     >

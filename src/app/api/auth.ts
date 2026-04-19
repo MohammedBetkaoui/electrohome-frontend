@@ -28,10 +28,23 @@ export interface AuthResponse {
   message: string;
   data?: {
     user: AuthUser;
-    token: string;
-    token_type: string;
+    token?: string;
+    token_type?: string;
   };
   errors?: Record<string, string[]>;
+}
+
+export interface UpdateProfilePayload {
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+export interface ChangePasswordPayload {
+  email: string;
+  current_password: string;
+  password: string;
+  password_confirmation: string;
 }
 
 // ── Register ────────────────────────────────────────────
@@ -79,4 +92,24 @@ export async function apiMe(token: string): Promise<AuthUser | null> {
   if (!res.ok) return null;
   const json = await res.json();
   return json?.data?.user ?? null;
+}
+
+export async function apiUpdateMe(token: string, payload: UpdateProfilePayload): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    method: "PUT",
+    headers: { ...headers(), Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+
+  return res.json();
+}
+
+export async function apiChangeMyPassword(token: string, payload: ChangePasswordPayload): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/auth/me/password`, {
+    method: "PUT",
+    headers: { ...headers(), Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+
+  return res.json();
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import {
@@ -94,6 +94,13 @@ const ORDER_STATUS_META: Record<string, { label: string; color: string }> = {
   returned: { label: "Retournée", color: "#6B7280" },
 };
 
+const AUTO_REFRESH_OPTIONS = [
+  { label: "30s", value: 30_000 },
+  { label: "60s", value: 60_000 },
+] as const;
+
+type AutoRefreshMs = (typeof AUTO_REFRESH_OPTIONS)[number]["value"];
+
 function formatPrice(value: number) {
   return value.toLocaleString("fr-DZ") + " DA";
 }
@@ -117,6 +124,16 @@ function formatShortDate(date: string | null) {
     day: "2-digit",
     month: "short",
     year: "numeric",
+  });
+}
+
+function formatRefreshTime(date: Date | null) {
+  if (!date) return "-";
+
+  return date.toLocaleTimeString("fr-DZ", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
   });
 }
 
@@ -161,30 +178,81 @@ export function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoRefreshMs, setAutoRefreshMs] = useState<AutoRefreshMs>(30_000);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const isFetchingRef = useRef(false);
 
-  const loadDashboard = async (refresh = false) => {
+  const loadDashboard = async ({
+    initial = false,
+    manual = false,
+    silent = false,
+  }: {
+    initial?: boolean;
+    manual?: boolean;
+    silent?: boolean;
+  } = {}) => {
+    if (isFetchingRef.current) {
+      return;
+    }
+
+    isFetchingRef.current = true;
+
     try {
-      if (refresh) {
-        setIsRefreshing(true);
-      } else {
+      if (initial) {
         setIsLoading(true);
+      }
+
+      if (manual) {
+        setIsRefreshing(true);
       }
 
       const data = await getAdminDashboard();
       setDashboard(data);
       setError(null);
+      setLastUpdatedAt(new Date());
     } catch (err) {
       const message = err instanceof Error ? err.message : "Impossible de charger le dashboard.";
       setError(message);
-      toast.error(message);
+
+      if (!silent) {
+        toast.error(message);
+      }
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
+      if (manual) {
+        setIsRefreshing(false);
+      }
+
+      isFetchingRef.current = false;
     }
   };
 
   useEffect(() => {
-    void loadDashboard();
+    void loadDashboard({ initial: true });
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      void loadDashboard({ silent: true });
+    }, autoRefreshMs);
+
+    return () => window.clearInterval(intervalId);
+  }, [autoRefreshMs]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadDashboard({ silent: true });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
   const kpis = useMemo(() => {
@@ -247,16 +315,39 @@ export function AdminDashboard() {
           <h2 className="text-[24px] text-[#1A2332] dark:text-white mt-1" style={{ fontWeight: 700 }}>
             Vue temps réel des 30 derniers jours
           </h2>
+          <p className="text-[12px] text-[#6B7280] dark:text-white/55 mt-2">
+            Derniere mise a jour: {formatRefreshTime(lastUpdatedAt)}
+          </p>
         </div>
-        <button
-          onClick={() => void loadDashboard(true)}
-          disabled={isRefreshing}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E5E7EB] dark:border-white/10 bg-white dark:bg-[#1E1E24] text-[13px] text-[#6B7280] dark:text-white/70 hover:border-[#FF6B35] hover:text-[#FF6B35] disabled:opacity-60"
-          style={{ fontWeight: 600 }}
-        >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          Actualiser
-        </button>
+        <div className="flex items-center gap-3 flex-wrap justify-end">
+          <div className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] dark:border-white/10 bg-white dark:bg-[#1E1E24] p-1.5">
+            <span className="pl-2 text-[12px] text-[#6B7280] dark:text-white/55">Auto-refresh</span>
+            {AUTO_REFRESH_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setAutoRefreshMs(option.value)}
+                className={`px-3 py-1.5 rounded-lg text-[12px] transition-colors ${
+                  autoRefreshMs === option.value
+                    ? "bg-[#FF6B35] text-white"
+                    : "text-[#6B7280] hover:text-[#1A2332] dark:hover:text-white"
+                }`}
+                style={{ fontWeight: autoRefreshMs === option.value ? 600 : 400 }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => void loadDashboard({ manual: true })}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E5E7EB] dark:border-white/10 bg-white dark:bg-[#1E1E24] text-[13px] text-[#6B7280] dark:text-white/70 hover:border-[#FF6B35] hover:text-[#FF6B35] disabled:opacity-60"
+            style={{ fontWeight: 600 }}
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            Actualiser
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
