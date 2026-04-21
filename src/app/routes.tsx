@@ -29,6 +29,7 @@ import { AdminAnalytics } from "./pages/admin/AdminAnalytics";
 import { AdminInventory } from "./pages/admin/AdminInventory";
 import { AdminReviews } from "./pages/admin/AdminReviews";
 import { AdminCategories } from "./pages/admin/AdminCategories";
+import { AdminBrands } from "./pages/admin/AdminBrands";
 import { AdminNotifications } from "./pages/admin/AdminNotifications";
 import { AdminPromotions } from "./pages/admin/AdminPromotions";
 
@@ -102,6 +103,7 @@ export const router = createBrowserRouter([
       { path: "produits/nouveau", Component: AdminProductForm },
       { path: "produits/modifier/:id", Component: AdminProductForm },
       { path: "categories", Component: AdminCategories },
+      { path: "marques", Component: AdminBrands },
       { path: "commandes", Component: AdminOrders },
       { path: "commandes/:id", Component: AdminOrderDetail },
       { path: "retours", Component: AdminReturns },

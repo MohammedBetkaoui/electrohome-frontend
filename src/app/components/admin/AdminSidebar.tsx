@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, RotateCcw, Users,
   FileText, Settings, ChevronLeft, ChevronRight, LogOut, X,
   BarChart3, Boxes, Star, Grid3X3,
-  Bell, Flame
+  Bell, Flame, Tags
 } from "lucide-react";
 import { useSidebar } from "./AdminLayout";
 
@@ -15,6 +15,7 @@ const NAV_SECTIONS = [
       { to: "/admin/analytics", icon: BarChart3, label: "Analytics" },
       { to: "/admin/produits", icon: Package, label: "Produits" },
       { to: "/admin/categories", icon: Grid3X3, label: "Catégories" },
+      { to: "/admin/marques", icon: Tags, label: "Marques" },
       { to: "/admin/commandes", icon: ShoppingCart, label: "Commandes" },
       { to: "/admin/retours", icon: RotateCcw, label: "Retours" },
     ],

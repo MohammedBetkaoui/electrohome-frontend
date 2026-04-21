@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Truck, Shield, Headphones, Award, ChevronRight, ArrowRight, Timer } from "lucide-react";
+import { Truck, Shield, Headphones, Award, ChevronRight, ArrowRight, Timer, Sparkles, ShieldCheck, Layers3 } from "lucide-react";
 import { toast } from "sonner";
-import { BRANDS, IMAGES, formatPrice, useStore } from "../data/store";
+import { IMAGES, formatPrice, useStore } from "../data/store";
+import { getCatalogBrands, type CatalogBrand } from "../api/brands";
 import { getCatalogCategories, type CatalogCategory } from "../api/categories";
 import { getCatalogBlogPosts } from "../api/blog";
 import { getCatalogProducts } from "../api/products";
@@ -89,8 +90,43 @@ function CategoryGridSkeleton() {
   );
 }
 
+function BrandGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <Skeleton key={index} className="h-24 w-full rounded-2xl" />
+      ))}
+    </div>
+  );
+}
+
+function getBrandInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("");
+}
+
+function getBrandAccent(index: number) {
+  const accents = [
+    "linear-gradient(135deg, rgba(232,64,12,0.18), rgba(255,205,178,0.32))",
+    "linear-gradient(135deg, rgba(12,74,110,0.18), rgba(125,211,252,0.26))",
+    "linear-gradient(135deg, rgba(22,101,52,0.16), rgba(187,247,208,0.26))",
+    "linear-gradient(135deg, rgba(91,33,182,0.16), rgba(221,214,254,0.26))",
+    "linear-gradient(135deg, rgba(146,64,14,0.18), rgba(253,230,138,0.28))",
+    "linear-gradient(135deg, rgba(155,28,28,0.15), rgba(254,202,202,0.26))",
+  ];
+
+  return accents[index % accents.length];
+}
+
 export function HomePage() {
   const { addToCart } = useStore();
+  const [brands, setBrands] = useState<CatalogBrand[]>([]);
+  const [brandsLoading, setBrandsLoading] = useState(true);
+  const [brandsError, setBrandsError] = useState("");
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoriesError, setCategoriesError] = useState("");
@@ -100,6 +136,33 @@ export function HomePage() {
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [blogLoading, setBlogLoading] = useState(true);
   const [blogError, setBlogError] = useState("");
+
+  useEffect(() => {
+    let ignore = false;
+
+    setBrandsLoading(true);
+
+    getCatalogBrands(6)
+      .then((items) => {
+        if (ignore) return;
+        setBrands(items);
+        setBrandsError("");
+      })
+      .catch((error) => {
+        if (ignore) return;
+        setBrands([]);
+        setBrandsError(error instanceof Error ? error.message : "Impossible de charger les marques.");
+      })
+      .finally(() => {
+        if (!ignore) {
+          setBrandsLoading(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -184,6 +247,10 @@ export function HomePage() {
 
   const flashProducts = featuredProducts.filter((product) => hasActivePromotion(product)).slice(0, 3);
   const firstCategorySlug = categories[0]?.slug || "refrigerateurs";
+  const brandCountLabel = brandsLoading ? "..." : String(brands.length);
+  const spotlightBrand = brands[0] || null;
+  const brandRail = brands.slice(1, 7);
+  const totalBrandProducts = brands.reduce((sum, brand) => sum + brand.productsCount, 0);
 
   const handleFlashAddToCart = (product: Product) => {
     const result = addToCart(product);
@@ -244,7 +311,7 @@ export function HomePage() {
             <div className="flex flex-wrap gap-6 md:gap-10">
               {[
                 { value: "5 000+", label: "Références" },
-                { value: "50+", label: "Marques" },
+                { value: brandCountLabel, label: "Marques" },
                 { value: "4.8/5", label: "Satisfaction" },
               ].map((stat) => (
                 <div key={stat.label}>
@@ -363,15 +430,156 @@ export function HomePage() {
         )}
       </section>
 
-      <section className="border-y border-border py-10">
+      <section className="border-y border-border bg-[linear-gradient(180deg,rgba(248,250,252,0.7)_0%,rgba(255,255,255,0)_100%)] py-14 dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.02)_0%,rgba(255,255,255,0)_100%)]">
         <div className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-20">
-          <p className="text-center text-xs text-muted-foreground uppercase tracking-widest mb-6">Nos marques partenaires</p>
-          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16">
-            {BRANDS.map((brand) => (
-              <Link key={brand} to="/marques" className="text-lg text-muted-foreground hover:text-foreground transition-colors" style={{ fontWeight: 600 }}>
-                {brand}
-              </Link>
-            ))}
+          <div className="mb-8 flex items-end justify-between gap-4">
+            <div>
+              <p className="inline-flex items-center gap-2 rounded-full border border-[#FED7AA] bg-[#FFF7ED] px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-[#C2410C] dark:border-white/10 dark:bg-white/5 dark:text-[#FFB089]">
+                <Sparkles className="h-3.5 w-3.5" />
+                Marques partenaires
+              </p>
+              <h2 className="mt-3 text-2xl md:text-3xl" style={{ fontWeight: 600 }}>
+                Une selection de marques de reference presentees avec clarte.
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                Les logos, le volume de produits et l'acces aux collections sont relies au catalogue afin de garantir une presentation fiable et constamment actualisee.
+              </p>
+            </div>
+            <Link to="/marques" className="hidden text-sm text-[#E8400C] md:inline-flex md:items-center md:gap-1">
+              Voir toutes les marques <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          {brandsLoading ? (
+            <BrandGridSkeleton />
+          ) : brands.length > 0 ? (
+            <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+              <div className="relative overflow-hidden rounded-[30px] border border-[#E5E7EB] bg-[radial-gradient(circle_at_top_left,rgba(232,64,12,0.22),transparent_30%),linear-gradient(145deg,#121826_0%,#182132_55%,#101828_100%)] p-6 text-white shadow-[0_30px_80px_rgba(15,23,42,0.15)] dark:border-white/10">
+                <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#E8400C]/15 blur-3xl" />
+                <div className="absolute bottom-0 left-12 h-24 w-24 rounded-full bg-[#F8C15C]/15 blur-2xl" />
+                <div className="relative flex h-full flex-col justify-between gap-8">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="max-w-lg">
+                      <p className="text-[11px] uppercase tracking-[0.3em] text-white/45">Marque a l'honneur</p>
+                      <h3 className="mt-3 text-3xl md:text-4xl" style={{ fontWeight: 700 }}>
+                        {spotlightBrand?.name || "Nos partenaires"}
+                      </h3>
+                      <p className="mt-3 text-sm leading-6 text-white/68">
+                        {spotlightBrand
+                          ? `${spotlightBrand.productsCount} produits disponibles dans le catalogue, avec une navigation directe vers sa collection.`
+                          : "Consultez une selection de marques reconnues pour leur fiabilite, leur qualite et leur conformite aux standards du catalogue."}
+                      </p>
+                    </div>
+
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[24px] border border-white/10 bg-white/10 text-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]">
+                      {spotlightBrand?.logoUrl ? (
+                        <img src={spotlightBrand.logoUrl} alt={spotlightBrand.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-[20px] tracking-[0.16em]" style={{ fontWeight: 700 }}>
+                          {getBrandInitials(spotlightBrand?.name || "EH")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {[
+                      { label: "Marques referencees", value: brands.length, icon: Layers3 },
+                      { label: "Produits associes", value: totalBrandProducts, icon: ShieldCheck },
+                      { label: "Acces direct", value: "100%", icon: Sparkles },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded-[22px] border border-white/10 bg-white/7 p-4 backdrop-blur">
+                        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
+                          <item.icon className="h-4 w-4 text-[#FFB089]" />
+                        </div>
+                        <p className="text-[22px] text-white" style={{ fontWeight: 700 }}>
+                          {item.value}
+                        </p>
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-white/45">{item.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    {spotlightBrand ? (
+                      <Link
+                        to={`/recherche?brand=${encodeURIComponent(spotlightBrand.name)}`}
+                        className="inline-flex items-center gap-2 rounded-2xl bg-[#E8400C] px-5 py-3 text-sm text-white shadow-[0_18px_35px_rgba(232,64,12,0.28)] hover:bg-[#D63A0A]"
+                        style={{ fontWeight: 600 }}
+                      >
+                        Explorer {spotlightBrand.name}
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    ) : null}
+                    <Link
+                      to="/marques"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-white/15 px-5 py-3 text-sm text-white/88 hover:bg-white/8"
+                    >
+                      Consulter toutes les marques
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {brandRail.map((brand, index) => (
+                  <Link
+                    key={brand.id}
+                    to={`/recherche?brand=${encodeURIComponent(brand.name)}`}
+                    className="group relative overflow-hidden rounded-[26px] border border-border bg-card p-5 transition-all hover:-translate-y-1 hover:border-[#E8400C]/30 hover:shadow-[0_24px_55px_rgba(15,23,42,0.1)]"
+                  >
+                    <div
+                      className="absolute inset-x-0 top-0 h-24 opacity-90"
+                      style={{ background: getBrandAccent(index) }}
+                    />
+                    <div className="relative">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[22px] border border-white/40 bg-white/80 text-[#E8400C] shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-[#FFB089]">
+                          {brand.logoUrl ? (
+                            <img src={brand.logoUrl} alt={brand.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="text-base tracking-[0.14em]" style={{ fontWeight: 700 }}>
+                              {getBrandInitials(brand.name)}
+                            </span>
+                          )}
+                        </div>
+                        <span className="rounded-full bg-white/85 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#6B7280] shadow-sm dark:bg-white/10 dark:text-white/60">
+                          #{index + 2}
+                        </span>
+                      </div>
+
+                      <div className="mt-10">
+                        <p className="text-lg text-foreground transition-colors group-hover:text-[#E8400C]" style={{ fontWeight: 600 }}>
+                          {brand.name}
+                        </p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">/{brand.slug}</p>
+                      </div>
+
+                      <div className="mt-5 flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-2xl text-foreground" style={{ fontWeight: 700 }}>{brand.productsCount}</p>
+                          <p className="text-xs text-muted-foreground">produits disponibles</p>
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-sm text-[#E8400C]">
+                          Ouvrir
+                          <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+              {brandsError || "Aucune marque n'est disponible pour le moment."}
+            </div>
+          )}
+
+          <div className="mt-4 md:hidden">
+            <Link to="/marques" className="inline-flex items-center gap-1 text-sm text-[#E8400C]">
+              Voir toutes les marques <ChevronRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </section>

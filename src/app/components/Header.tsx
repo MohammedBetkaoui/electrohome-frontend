@@ -63,7 +63,8 @@ export function Header() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) navigate(`/recherche?q=${encodeURIComponent(searchQuery)}`);
+    const trimmedQuery = searchQuery.trim();
+    navigate(trimmedQuery ? `/recherche?q=${encodeURIComponent(trimmedQuery)}` : "/recherche");
     setSearchOpen(false);
   };
 
@@ -224,10 +225,15 @@ export function Header() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Rechercher un produit..."
-                  className="flex-1 px-4 py-2.5 rounded-lg bg-input-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring dark:border-white/15 dark:bg-[#0C1420] dark:text-white dark:placeholder:text-white/45 dark:focus:border-[#FF6B35]/70 dark:focus:ring-[#FF6B35]/35"
                   autoFocus
                 />
-                <button type="submit" className="px-5 py-2.5 rounded-lg bg-[#E8400C] dark:bg-[#FF5722] text-white text-sm">Rechercher</button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-[#E8400C] px-5 py-2.5 text-sm text-white transition-colors hover:bg-[#D73A0A] dark:bg-[#FF6B35] dark:hover:bg-[#FF845E]"
+                >
+                  Rechercher
+                </button>
               </div>
             </form>
           )}
@@ -271,7 +277,7 @@ export function Header() {
           {[
             { to: "/", icon: Home, label: "Accueil" },
             { to: "/categorie/refrigerateurs", icon: Grid3X3, label: "Catégories" },
-            { to: "/recherche?q=", icon: Search, label: "Recherche" },
+            { to: "/recherche", icon: Search, label: "Recherche" },
             { to: "/panier", icon: ShoppingCart, label: "Panier" },
             { to: "/compte", icon: User, label: "Compte" },
           ].map((item) => (
