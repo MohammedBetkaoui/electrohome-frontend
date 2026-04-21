@@ -21,6 +21,7 @@ import {
   getBrands,
   updateBrand,
 } from "../../api/adminBrands";
+import { normalizeRemoteImageUrl } from "../../lib/imageUrl";
 
 function getBrandInitials(name: string) {
   return name
@@ -42,6 +43,7 @@ function BrandFormModal({
 }) {
   const isEdit = !!brand;
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
   const [form, setForm] = useState({
     name: brand?.name || "",
     slug: brand?.slug || "",
@@ -49,7 +51,21 @@ function BrandFormModal({
   });
 
   const previewLabel = form.name.trim() || "Nouvelle marque";
-  const canPreviewImage = form.logo_url.trim().length > 0;
+  const normalizedLogoUrl = normalizeRemoteImageUrl(form.logo_url);
+  const canPreviewImage = normalizedLogoUrl.length > 0 && !imagePreviewFailed;
+
+  const setLogoUrl = (value: string) => {
+    setImagePreviewFailed(false);
+    setForm((current) => ({ ...current, logo_url: value }));
+  };
+
+  const normalizeLogoField = () => {
+    const normalized = normalizeRemoteImageUrl(form.logo_url);
+
+    if (normalized !== form.logo_url) {
+      setForm((current) => ({ ...current, logo_url: normalized }));
+    }
+  };
 
   const handleSubmit = async () => {
     if (!form.name.trim()) {
@@ -57,13 +73,15 @@ function BrandFormModal({
       return;
     }
 
+    const normalized = normalizeRemoteImageUrl(form.logo_url);
+
     setIsSubmitting(true);
     try {
       await onSave(
         {
           name: form.name.trim(),
           slug: form.slug.trim() || undefined,
-          logo_url: form.logo_url.trim() || null,
+          logo_url: normalized || null,
         },
         brand?.id
       );
@@ -103,7 +121,12 @@ function BrandFormModal({
                 <div className="flex items-center gap-4">
                   <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[22px] border border-white/12 bg-white/10">
                     {canPreviewImage ? (
-                      <img src={form.logo_url} alt={previewLabel} className="h-full w-full object-cover" />
+                      <img
+                        src={normalizedLogoUrl}
+                        alt={previewLabel}
+                        className="h-full w-full object-cover"
+                        onError={() => setImagePreviewFailed(true)}
+                      />
                     ) : (
                       <span className="text-[20px] tracking-[0.14em]" style={{ fontWeight: 700 }}>
                         {getBrandInitials(previewLabel) || "BR"}
@@ -118,7 +141,11 @@ function BrandFormModal({
                       /{form.slug.trim() || "slug-auto"}
                     </p>
                     <p className="mt-3 text-[12px] text-white/70">
-                      {canPreviewImage ? "Logo URL detecte" : "Aucun logo pour le moment"}
+                      {normalizedLogoUrl
+                        ? canPreviewImage
+                          ? "Lien d'image valide detecte"
+                          : "Le lien saisi ne permet pas de charger une image"
+                        : "Aucun logo pour le moment"}
                     </p>
                   </div>
                 </div>
@@ -171,10 +198,20 @@ function BrandFormModal({
                 </label>
                 <input
                   value={form.logo_url}
-                  onChange={(event) => setForm({ ...form, logo_url: event.target.value })}
+                  onChange={(event) => setLogoUrl(event.target.value)}
+                  onBlur={normalizeLogoField}
                   className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 text-[13px] text-[#1A2332] outline-none transition-colors focus:border-[#FF6B35] dark:border-white/10 dark:bg-white/5 dark:text-white"
                   placeholder="https://cdn.example.com/brands/siemens.png"
                 />
+                <p className="mt-1 text-[11px] text-[#9CA3AF]">
+                  Les liens `https`, `www`, Google Drive, Dropbox et GitHub sont normalises automatiquement lorsque c'est possible.
+                </p>
+                {normalizedLogoUrl ? (
+                  <div className="mt-3 rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-3 dark:border-white/10 dark:bg-white/5">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#9CA3AF]">Lien normalise</p>
+                    <p className="mt-1 break-all text-[12px] text-[#1A2332] dark:text-white/80">{normalizedLogoUrl}</p>
+                  </div>
+                ) : null}
               </div>
             </div>
 
