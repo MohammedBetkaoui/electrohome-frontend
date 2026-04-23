@@ -12,6 +12,7 @@ import {
   type OrderCreateResponse,
   type OrderPreview,
   type ShippingAddress,
+  type WilayaOption,
 } from "../api/orders";
 import { getCatalogProductsByIds } from "../api/products";
 import { formatPrice, type Product, useStore } from "../data/store";
@@ -31,6 +32,7 @@ type AddressFormState = {
   city: string;
   postal_code: string;
   phone: string;
+  wilaya_id: number | null;
   save: boolean;
 };
 
@@ -72,6 +74,7 @@ export function CheckoutPage() {
   const [selectedAddressMode, setSelectedAddressMode] = useState<"saved" | "new">("new");
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [deliveryMethodId, setDeliveryMethodId] = useState<number | null>(null);
+  const [deliveryType, setDeliveryType] = useState<"home" | "agency">("home");
   const [addressForm, setAddressForm] = useState<AddressFormState>({
     first_name: user?.first_name || "",
     last_name: user?.last_name || "",
@@ -79,6 +82,7 @@ export function CheckoutPage() {
     city: "",
     postal_code: "",
     phone: "",
+    wilaya_id: null,
     save: true,
   });
   const [promoInput, setPromoInput] = useState(checkoutPromoCode);
@@ -117,11 +121,49 @@ export function CheckoutPage() {
 
   const fallbackSubtotal = resolvedCartItems.reduce((sum, item) => sum + item.lineTotal, 0);
   const selectedDeliveryMethod = checkoutOptions?.delivery_methods.find((method) => method.id === deliveryMethodId) || null;
-  const fallbackDelivery = selectedDeliveryMethod?.name === "standard"
-    ? fallbackSubtotal >= (checkoutOptions?.delivery_rules.free_threshold || 70000)
-      ? 0
-      : checkoutOptions?.delivery_rules.standard_fee || 4000
-    : selectedDeliveryMethod?.price || 0;
+
+  // Wilaya active: déterminée depuis l'adresse enregistrée ou le formulaire
+  const activeWilayaId: number | null = useMemo(() => {
+    if (selectedAddressMode === "saved" && selectedAddressId) {
+      const addr = addresses.find((a) => a.id === selectedAddressId);
+      return addr?.wilaya_id ?? null;
+    }
+    return addressForm.wilaya_id;
+  }, [selectedAddressMode, selectedAddressId, addresses, addressForm.wilaya_id]);
+
+  const activeWilaya: WilayaOption | null = useMemo(() => {
+    if (!activeWilayaId || !checkoutOptions?.wilayas) return null;
+    return checkoutOptions.wilayas.find((w) => w.id === activeWilayaId) ?? null;
+  }, [activeWilayaId, checkoutOptions]);
+
+  const fallbackDelivery = useMemo(() => {
+    if (activeWilaya) {
+      const basePrice = deliveryType === "agency"
+        ? activeWilaya.delivery_price_agency
+        : activeWilaya.delivery_price;
+      // Supplément poids fallback depuis weight_pricings
+      const totalWeight = resolvedCartItems.reduce(
+        (sum, item) => sum + ((item.effectiveProduct as any).weight_kg ?? 0) * item.quantity,
+        0,
+      );
+      const weightPricings = checkoutOptions?.weight_pricings ?? [];
+      let weightSurcharge = 0;
+      if (totalWeight > 0 && weightPricings.length > 0) {
+        const tier = weightPricings
+          .filter((t) => t.max_weight_kg >= totalWeight)
+          .sort((a, b) => a.max_weight_kg - b.max_weight_kg)[0]
+          ?? weightPricings.sort((a, b) => b.max_weight_kg - a.max_weight_kg)[0];
+        if (tier) weightSurcharge = tier.price;
+      }
+      return basePrice + weightSurcharge;
+    }
+    if (selectedDeliveryMethod?.name === "standard") {
+      return fallbackSubtotal >= (checkoutOptions?.delivery_rules.free_threshold || 70000)
+        ? 0
+        : checkoutOptions?.delivery_rules.standard_fee || 4000;
+    }
+    return selectedDeliveryMethod?.price || 0;
+  }, [activeWilaya, deliveryType, selectedDeliveryMethod, fallbackSubtotal, checkoutOptions, resolvedCartItems]);
   const subtotal = preview?.subtotal ?? fallbackSubtotal;
   const deliveryCost = preview?.delivery_cost ?? fallbackDelivery;
   const discountAmount = preview?.discount_amount ?? 0;
@@ -252,7 +294,7 @@ export function CheckoutPage() {
   }, [checkoutPromoCode]);
 
   useEffect(() => {
-    if (cart.length === 0 || !deliveryMethodId) {
+    if (cart.length === 0) {
       setPreviewLoading(false);
       setPreview(null);
       setPreviewError("");
@@ -273,6 +315,8 @@ export function CheckoutPage() {
       delivery_method_id: deliveryMethodId,
       items: cartItemsPayload,
       promo_code: checkoutPromoCode || undefined,
+      wilaya_id: activeWilayaId ?? undefined,
+      delivery_type: deliveryType,
     })
       .then((nextPreview) => {
         if (ignore) return;
@@ -293,10 +337,10 @@ export function CheckoutPage() {
     return () => {
       ignore = true;
     };
-  }, [cartItemsPayload, checkoutPromoCode, deliveryMethodId, cart.length, invalidItems.length]);
+  }, [cartItemsPayload, checkoutPromoCode, deliveryMethodId, deliveryType, cart.length, invalidItems.length, activeWilayaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const applyPromo = async () => {
-    if (!deliveryMethodId || cart.length === 0 || invalidItems.length > 0) {
+    if (cart.length === 0 || invalidItems.length > 0) {
       toast.error("Corrigez votre panier avant d'appliquer un code promo.");
       return;
     }
@@ -309,6 +353,8 @@ export function CheckoutPage() {
         delivery_method_id: deliveryMethodId,
         items: cartItemsPayload,
         promo_code: normalizedPromoCode || undefined,
+        wilaya_id: activeWilayaId ?? undefined,
+        delivery_type: deliveryType,
       });
 
       setPreview(nextPreview);
@@ -328,7 +374,7 @@ export function CheckoutPage() {
   const removePromo = async () => {
     setPromoInput("");
 
-    if (!deliveryMethodId || cart.length === 0 || invalidItems.length > 0) {
+    if (cart.length === 0 || invalidItems.length > 0) {
       setCheckoutPromoCode("");
       setPreview(null);
       return;
@@ -340,6 +386,8 @@ export function CheckoutPage() {
       const nextPreview = await previewOrder({
         delivery_method_id: deliveryMethodId,
         items: cartItemsPayload,
+        wilaya_id: activeWilayaId ?? undefined,
+        delivery_type: deliveryType,
       });
 
       setCheckoutPromoCode("");
@@ -356,7 +404,7 @@ export function CheckoutPage() {
     }
   };
 
-  const updateAddressField = (field: keyof AddressFormState, value: string | boolean) => {
+  const updateAddressField = (field: keyof AddressFormState, value: string | boolean | number | null) => {
     setAddressForm((currentState) => ({
       ...currentState,
       [field]: value,
@@ -370,10 +418,6 @@ export function CheckoutPage() {
 
   const validateDeliveryStep = () => {
     const nextErrors: Record<string, string> = {};
-
-    if (!deliveryMethodId) {
-      nextErrors.delivery_method_id = "Choisissez une méthode de livraison.";
-    }
 
     if (selectedAddressMode === "saved") {
       if (!selectedAddressId) {
@@ -410,7 +454,7 @@ export function CheckoutPage() {
   };
 
   const submitOrder = async () => {
-    if (!deliveryMethodId || cart.length === 0 || invalidItems.length > 0) {
+    if (cart.length === 0 || invalidItems.length > 0) {
       toast.error("Votre panier doit etre corrige avant la commande.");
       return;
     }
@@ -431,6 +475,8 @@ export function CheckoutPage() {
               delivery_method_id: deliveryMethodId,
               items: cartItemsPayload,
               promo_code: checkoutPromoCode || undefined,
+              wilaya_id: activeWilayaId ?? undefined,
+              delivery_type: deliveryType,
               payment_method: "cash_on_delivery" as const,
               notes: notes.trim() || undefined,
             }
@@ -442,11 +488,14 @@ export function CheckoutPage() {
                 city: addressForm.city.trim(),
                 phone: addressForm.phone.trim(),
                 postal_code: addressForm.postal_code.trim() || undefined,
+                wilaya_id: addressForm.wilaya_id ?? undefined,
                 save: addressForm.save,
               },
               delivery_method_id: deliveryMethodId,
               items: cartItemsPayload,
               promo_code: checkoutPromoCode || undefined,
+              wilaya_id: addressForm.wilaya_id ?? undefined,
+              delivery_type: deliveryType,
               payment_method: "cash_on_delivery" as const,
               notes: notes.trim() || undefined,
             };
@@ -590,6 +639,11 @@ export function CheckoutPage() {
                           </div>
                           <p className="text-sm text-muted-foreground">{address.address}</p>
                           <p className="text-sm text-muted-foreground">{address.postal_code ? `${address.postal_code} ` : ""}{address.city}</p>
+                          {address.wilaya_name && (
+                            <p className="text-xs text-[#E8400C] mt-1 flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />{address.wilaya_name}
+                            </p>
+                          )}
                           <p className="text-xs text-muted-foreground mt-2">{address.phone}</p>
                         </button>
                       ))}
@@ -621,6 +675,35 @@ export function CheckoutPage() {
                       )}
                     </div>
                   ))}
+
+                  {/* Wilaya selector */}
+                  {checkoutOptions && checkoutOptions.wilayas.length > 0 && (
+                    <div className="sm:col-span-2">
+                      <label className="text-sm mb-1 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-[#E8400C]" /> Wilaya (région)
+                      </label>
+                      <select
+                        value={addressForm.wilaya_id ?? ""}
+                        onChange={(event) => updateAddressField("wilaya_id", event.target.value ? parseInt(event.target.value) : null)}
+                        className="w-full px-4 py-2.5 rounded-lg border border-border bg-card text-sm"
+                      >
+                        <option value="">— Sélectionnez votre wilaya —</option>
+                        {checkoutOptions.wilayas.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {w.name} — {w.delivery_price.toLocaleString("fr-DZ")} DA
+                          </option>
+                        ))}
+                      </select>
+                      {addressForm.wilaya_id && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Domicile : {checkoutOptions.wilayas.find((w) => w.id === addressForm.wilaya_id)?.delivery_price.toLocaleString("fr-DZ")} DA
+                          {" · "}
+                          Bureau agence : {checkoutOptions.wilayas.find((w) => w.id === addressForm.wilaya_id)?.delivery_price_agency.toLocaleString("fr-DZ")} DA
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <label className="sm:col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
                     <input
                       type="checkbox"
@@ -637,45 +720,39 @@ export function CheckoutPage() {
                 <p className="text-xs text-destructive">{fieldErrors.shipping_address_id}</p>
               )}
 
-              <h3 className="text-sm mt-6" style={{ fontWeight: 600 }}>Mode de livraison</h3>
-              <div className="space-y-3">
-                {checkoutOptions?.delivery_methods.map((method) => {
-                  const isStandardFree =
-                    method.name === "standard" &&
-                    subtotal >= (checkoutOptions.delivery_rules.free_threshold || 70000);
-                  const displayedPrice = isStandardFree ? 0 : method.name === "standard"
-                    ? checkoutOptions.delivery_rules.standard_fee
-                    : method.price;
-
-                  return (
-                    <label key={method.id} className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-colors ${deliveryMethodId === method.id ? "border-[#E8400C] bg-[#E8400C]/5" : "border-border"}`}>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          name="delivery"
-                          checked={deliveryMethodId === method.id}
-                          onChange={() => setDeliveryMethodId(method.id)}
-                          className="accent-[#E8400C]"
-                        />
-                        <div>
-                          <p className="text-sm" style={{ fontWeight: 500 }}>{method.label}</p>
-                          <p className="text-xs text-muted-foreground">{method.description}</p>
-                        </div>
+              {activeWilaya && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Type de livraison</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${deliveryType === "home" ? "border-[#E8400C] bg-[#E8400C]/5" : "border-border"}`}>
+                      <input
+                        type="radio"
+                        checked={deliveryType === "home"}
+                        onChange={() => setDeliveryType("home")}
+                        className="accent-[#E8400C]"
+                      />
+                      <div>
+                        <p className="text-sm font-medium">À domicile</p>
+                        <p className="text-xs text-muted-foreground">{activeWilaya.delivery_price.toLocaleString("fr-DZ")} DA</p>
                       </div>
-                      <span className="text-sm" style={{ fontWeight: 500 }}>
-                        {displayedPrice === 0 ? "Gratuite" : formatPrice(displayedPrice)}
-                      </span>
                     </label>
-                  );
-                })}
-              </div>
-
-              {fieldErrors.delivery_method_id && (
-                <p className="text-xs text-destructive">{fieldErrors.delivery_method_id}</p>
+                    <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${deliveryType === "agency" ? "border-[#E8400C] bg-[#E8400C]/5" : "border-border"}`}>
+                      <input
+                        type="radio"
+                        checked={deliveryType === "agency"}
+                        onChange={() => setDeliveryType("agency")}
+                        className="accent-[#E8400C]"
+                      />
+                      <div>
+                        <p className="text-sm font-medium">Bureau agence</p>
+                        <p className="text-xs text-muted-foreground">{activeWilaya.delivery_price_agency.toLocaleString("fr-DZ")} DA</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
               )}
 
               <button
-                onClick={continueToPayment}
                 disabled={!canContinueToPayment}
                 className="w-full px-6 py-3.5 rounded-lg bg-[#E8400C] text-white hover:opacity-90 transition-opacity mt-4 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -710,6 +787,11 @@ export function CheckoutPage() {
                           <p className="text-foreground" style={{ fontWeight: 500 }}>{selectedAddress.full_name}</p>
                           <p>{selectedAddress.address}</p>
                           <p>{selectedAddress.postal_code ? `${selectedAddress.postal_code} ` : ""}{selectedAddress.city}</p>
+                          {selectedAddress.wilaya_name && (
+                            <p className="text-[#E8400C] flex items-center gap-1 mt-0.5">
+                              <MapPin className="w-3 h-3" />{selectedAddress.wilaya_name}
+                            </p>
+                          )}
                           <p>{selectedAddress.phone}</p>
                         </div>
                       ) : null;
@@ -719,6 +801,11 @@ export function CheckoutPage() {
                       <p className="text-foreground" style={{ fontWeight: 500 }}>{addressForm.first_name} {addressForm.last_name}</p>
                       <p>{addressForm.address}</p>
                       <p>{addressForm.postal_code ? `${addressForm.postal_code} ` : ""}{addressForm.city}</p>
+                      {activeWilaya && (
+                        <p className="text-[#E8400C] flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-3 h-3" />{activeWilaya.name}
+                        </p>
+                      )}
                       <p>{addressForm.phone}</p>
                     </div>
                   )}
@@ -813,7 +900,21 @@ export function CheckoutPage() {
 
               <div className="border-t border-border pt-3 space-y-1 text-sm">
                 <div className="flex justify-between text-muted-foreground"><span>Sous-total</span><span>{formatPrice(subtotal)}</span></div>
-                <div className="flex justify-between text-muted-foreground"><span>Livraison</span><span>{deliveryCost === 0 ? "Gratuite" : formatPrice(deliveryCost)}</span></div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Livraison{activeWilaya ? ` (${activeWilaya.name})` : ""}{activeWilaya ? ` · ${deliveryType === "agency" ? "Bureau agence" : "Domicile"}` : ""}</span>
+                  <span>{deliveryCost === 0 ? "Gratuite" : formatPrice(deliveryCost)}</span>
+                </div>
+                {preview?.weight_surcharge != null && preview.weight_surcharge > 0 && (
+                  <div className="flex justify-between text-muted-foreground text-xs">
+                    <span>dont frais poids</span>
+                    <span>+{formatPrice(preview.weight_surcharge)}</span>
+                  </div>
+                )}
+                {preview?.total_weight_kg != null && preview.total_weight_kg > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Poids total : {preview.total_weight_kg.toFixed(1)} kg
+                  </p>
+                )}
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-[#22C55E]"><span>Réduction</span><span>-{formatPrice(discountAmount)}</span></div>
                 )}

@@ -35,6 +35,7 @@ export function AdminProductForm() {
     energy: "A+",
     specs: "",
     description: "",
+    weight_kg: "",
   });
 
   const [images, setImages] = useState<{file: File | null, url: string}[]>([]);
@@ -68,6 +69,7 @@ export function AdminProductForm() {
             energy: product.energy || "A+",
             specs: product.specs || "",
             description: product.description || "",
+            weight_kg: product.weight_kg != null ? product.weight_kg.toString() : "",
           });
 
           setImages(
@@ -123,6 +125,7 @@ export function AdminProductForm() {
     data.append("energy", form.energy);
     data.append("specs", form.specs);
     data.append("description", form.description);
+    if (form.weight_kg) data.append("weight_kg", form.weight_kg);
 
     const newFiles = images.filter(img => img.file).map(img => img.file as File);
     if (newFiles.length > 0) {
@@ -274,6 +277,15 @@ export function AdminProductForm() {
               <div>
                 <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Quantité en stock *</label>
                 <input type="number" value={form.stock} onChange={(e) => set("stock", e.target.value)} className="w-full px-4 py-3 rounded-xl bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="24" min="0" />
+              </div>
+
+              <div>
+                <label className="block text-[12px] text-[#6B7280] dark:text-white/50 mb-1.5" style={{ fontWeight: 500 }}>Poids (kg)</label>
+                <div className="relative">
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9CA3AF] text-[12px]">kg</span>
+                  <input type="number" value={form.weight_kg} onChange={(e) => set("weight_kg", e.target.value)} className="w-full px-4 pr-10 py-3 rounded-xl bg-[#F9FAFB] dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[13px] text-[#1A2332] dark:text-white outline-none focus:border-[#FF6B35] transition-colors" placeholder="12.5" min="0" step="0.1" />
+                </div>
+                <p className="text-[11px] text-[#9CA3AF] mt-1">Utilisé pour calculer les frais de livraison (lourd &gt;20 kg)</p>
               </div>
             </div>
           </div>

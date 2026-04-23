@@ -32,6 +32,7 @@ import { AdminCategories } from "./pages/admin/AdminCategories";
 import { AdminBrands } from "./pages/admin/AdminBrands";
 import { AdminNotifications } from "./pages/admin/AdminNotifications";
 import { AdminPromotions } from "./pages/admin/AdminPromotions";
+import { AdminWilayas } from "./pages/admin/AdminWilayas";
 
 // ── Guards ──────────────────────────────────────────────────
 import { GuestGuard } from "./components/guards/GuestGuard";
@@ -110,6 +111,7 @@ export const router = createBrowserRouter([
       { path: "clients", Component: AdminClients },
       { path: "inventaire", Component: AdminInventory },
       { path: "promotions", Component: AdminPromotions },
+      { path: "wilayas", Component: AdminWilayas },
       { path: "avis", Component: AdminReviews },
       { path: "blog", Component: AdminBlog },
       { path: "notifications", Component: AdminNotifications },

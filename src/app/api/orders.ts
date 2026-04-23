@@ -29,6 +29,19 @@ export interface DeliveryRules {
   standard_fee: number;
 }
 
+export interface WilayaOption {
+  id: number;
+  name: string;
+  delivery_price: number;
+  delivery_price_agency: number;
+}
+
+export interface WeightPricingOption {
+  id: number;
+  max_weight_kg: number;
+  price: number;
+}
+
 export interface PaymentMethodOption {
   value: "cash_on_delivery";
   label: string;
@@ -38,6 +51,8 @@ export interface PaymentMethodOption {
 export interface CheckoutOptions {
   delivery_methods: DeliveryMethod[];
   delivery_rules: DeliveryRules;
+  wilayas: WilayaOption[];
+  weight_pricings: WeightPricingOption[];
   payment_methods: PaymentMethodOption[];
 }
 
@@ -50,6 +65,7 @@ export interface ShippingAddress {
   postal_code: string | null;
   city: string;
   wilaya_id: number | null;
+  wilaya_name: string | null;
   phone: string;
   is_default: boolean;
 }
@@ -66,6 +82,7 @@ export interface OrderAddressPayload {
   city: string;
   phone: string;
   postal_code?: string;
+  wilaya_id?: number;
   save?: boolean;
 }
 
@@ -73,10 +90,14 @@ export interface OrderPreview {
   items_count: number;
   subtotal: number;
   delivery_cost: number;
+  weight_surcharge: number;
   discount_amount: number;
   total_ttc: number;
   promo_code: string | null;
   delivery_method: DeliveryMethod;
+  wilaya: WilayaOption | null;
+  delivery_type: "home" | "agency";
+  total_weight_kg: number;
 }
 
 export interface PlaceOrderPayload {
@@ -85,6 +106,8 @@ export interface PlaceOrderPayload {
   delivery_method_id: number;
   items: OrderItemPayload[];
   promo_code?: string;
+  wilaya_id?: number;
+  delivery_type?: "home" | "agency";
   payment_method: "cash_on_delivery";
   notes?: string;
 }
@@ -215,6 +238,8 @@ export function previewOrder(payload: {
   delivery_method_id: number;
   items: OrderItemPayload[];
   promo_code?: string;
+  wilaya_id?: number;
+  delivery_type?: "home" | "agency";
 }) {
   return request<OrderPreview>("/checkout/preview", {
     body: payload,

@@ -36,6 +36,7 @@ export interface AdminProduct {
   energy?: string | null;
   specs?: string | null;
   description?: string | null;
+  weight_kg?: number | null;
   createdAt?: string;
 }
 
