@@ -82,13 +82,7 @@ export function CartPage() {
     [validItems],
   );
 
-  const standardDeliveryMethod = useMemo(
-    () => checkoutOptions?.delivery_methods.find((method) => method.name === "standard") || checkoutOptions?.delivery_methods[0] || null,
-    [checkoutOptions],
-  );
   const freeShippingThreshold = checkoutOptions?.delivery_rules.free_threshold || 70000;
-  const freeShippingProgress = Math.min(100, Math.round((subtotal / freeShippingThreshold) * 100));
-  const amountUntilFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
   const fallbackDelivery = subtotal >= freeShippingThreshold
     ? 0
     : checkoutOptions?.delivery_rules.standard_fee || 4000;
@@ -185,7 +179,7 @@ export function CartPage() {
   }, [cartIdsKey, refreshSeed]);
 
   useEffect(() => {
-    if (cart.length === 0 || !standardDeliveryMethod) {
+    if (cart.length === 0) {
       setSummaryLoading(false);
       setPreview(null);
       setSummaryError("");
@@ -204,7 +198,6 @@ export function CartPage() {
     setSummaryLoading(true);
 
     previewOrder({
-      delivery_method_id: standardDeliveryMethod.id,
       items: cartItemsPayload,
       promo_code: checkoutPromoCode || undefined,
     })
@@ -227,10 +220,10 @@ export function CartPage() {
     return () => {
       ignore = true;
     };
-  }, [cart.length, cartItemsPayload, checkoutPromoCode, invalidItems.length, standardDeliveryMethod]);
+  }, [cart.length, cartItemsPayload, checkoutPromoCode, invalidItems.length]);
 
   const applyPromo = async () => {
-    if (!standardDeliveryMethod || validItems.length === 0 || invalidItems.length > 0 || catalogLoading) {
+    if (validItems.length === 0 || invalidItems.length > 0 || catalogLoading) {
       toast.error("Corrigez votre panier avant d'appliquer un code promo.");
       return;
     }
@@ -240,7 +233,6 @@ export function CartPage() {
 
     try {
       const nextPreview = await previewOrder({
-        delivery_method_id: standardDeliveryMethod.id,
         items: cartItemsPayload,
         promo_code: normalizedPromoCode || undefined,
       });
@@ -508,21 +500,6 @@ export function CartPage() {
               </p>
             </div>
 
-            <div className="hidden md:block rounded-xl bg-muted/60 p-4 space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Livraison gratuite</span>
-                <span style={{ fontWeight: 600 }}>
-                  {amountUntilFreeShipping === 0 ? "Debloquee" : `Encore ${formatPrice(amountUntilFreeShipping)}`}
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-background overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-[#E8400C] transition-all"
-                  style={{ width: `${freeShippingProgress}%` }}
-                />
-              </div>
-            </div>
-
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Sous-total</span>
@@ -530,7 +507,7 @@ export function CartPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Livraison</span>
-                <span>{delivery === 0 ? "Gratuite" : formatPrice(delivery)}</span>
+                <span className="text-xs text-muted-foreground italic">Calculee a la commande</span>
               </div>
               {savings > 0 && (
                 <div className="flex justify-between text-[#22C55E]">
@@ -566,7 +543,7 @@ export function CartPage() {
               <button
                 onClick={async () => {
                   setPromoInput("");
-                  if (!standardDeliveryMethod || validItems.length === 0 || invalidItems.length > 0 || catalogLoading) {
+                  if (validItems.length === 0 || invalidItems.length > 0 || catalogLoading) {
                     setCheckoutPromoCode("");
                     setPreview(null);
                     return;
@@ -576,7 +553,6 @@ export function CartPage() {
 
                   try {
                     const nextPreview = await previewOrder({
-                      delivery_method_id: standardDeliveryMethod.id,
                       items: cartItemsPayload,
                     });
 
@@ -606,6 +582,7 @@ export function CartPage() {
             <div className="border-t border-border pt-4 flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Total TTC</p>
+                <p className="text-xs text-muted-foreground/70 mb-0.5">Hors frais de livraison</p>
                 <p className="text-2xl sm:text-lg" style={{ fontWeight: 700 }}>
                   {formatPrice(total)}
                 </p>
@@ -643,7 +620,7 @@ export function CartPage() {
                 {
                   icon: Truck,
                   title: "Livraison suivie",
-                  text: "Estimation basee sur la methode standard et le montant de votre panier.",
+                  text: "Estimation basee sur la zone de livraison et le montant de votre panier.",
                 },
                 {
                   icon: Shield,

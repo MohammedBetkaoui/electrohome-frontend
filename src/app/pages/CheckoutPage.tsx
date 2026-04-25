@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { AlertTriangle, Check, CreditCard, Loader2, Truck, Package, MapPin } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Truck, Package, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import {
   ApiError,
@@ -21,8 +21,7 @@ import { useAuth } from "../context/AuthContext";
 
 const steps = [
   { id: 1, label: "Livraison", icon: Truck },
-  { id: 2, label: "Paiement", icon: CreditCard },
-  { id: 3, label: "Confirmation", icon: Check },
+  { id: 2, label: "Confirmation", icon: Check },
 ];
 
 type AddressFormState = {
@@ -73,7 +72,6 @@ export function CheckoutPage() {
   const [addresses, setAddresses] = useState<ShippingAddress[]>([]);
   const [selectedAddressMode, setSelectedAddressMode] = useState<"saved" | "new">("new");
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
-  const [deliveryMethodId, setDeliveryMethodId] = useState<number | null>(null);
   const [deliveryType, setDeliveryType] = useState<"home" | "agency">("home");
   const [addressForm, setAddressForm] = useState<AddressFormState>({
     first_name: user?.first_name || "",
@@ -120,7 +118,6 @@ export function CheckoutPage() {
   );
 
   const fallbackSubtotal = resolvedCartItems.reduce((sum, item) => sum + item.lineTotal, 0);
-  const selectedDeliveryMethod = checkoutOptions?.delivery_methods.find((method) => method.id === deliveryMethodId) || null;
 
   // Wilaya active: déterminée depuis l'adresse enregistrée ou le formulaire
   const activeWilayaId: number | null = useMemo(() => {
@@ -157,13 +154,10 @@ export function CheckoutPage() {
       }
       return basePrice + weightSurcharge;
     }
-    if (selectedDeliveryMethod?.name === "standard") {
-      return fallbackSubtotal >= (checkoutOptions?.delivery_rules.free_threshold || 70000)
-        ? 0
-        : checkoutOptions?.delivery_rules.standard_fee || 4000;
-    }
-    return selectedDeliveryMethod?.price || 0;
-  }, [activeWilaya, deliveryType, selectedDeliveryMethod, fallbackSubtotal, checkoutOptions, resolvedCartItems]);
+    return fallbackSubtotal >= (checkoutOptions?.delivery_rules.free_threshold || 70000)
+      ? 0
+      : checkoutOptions?.delivery_rules.standard_fee || 4000;
+  }, [activeWilaya, deliveryType, fallbackSubtotal, checkoutOptions, resolvedCartItems]);
   const subtotal = preview?.subtotal ?? fallbackSubtotal;
   const deliveryCost = preview?.delivery_cost ?? fallbackDelivery;
   const discountAmount = preview?.discount_amount ?? 0;
@@ -199,11 +193,6 @@ export function CheckoutPage() {
 
         setCheckoutOptions(options);
         setAddresses(savedAddresses);
-
-        const defaultDeliveryMethod = options.delivery_methods[0] || null;
-        if (defaultDeliveryMethod) {
-          setDeliveryMethodId(defaultDeliveryMethod.id);
-        }
 
         if (savedAddresses.length > 0) {
           const defaultAddress = savedAddresses.find((address) => address.is_default) || savedAddresses[0];
@@ -312,7 +301,6 @@ export function CheckoutPage() {
 
     setPreviewLoading(true);
     previewOrder({
-      delivery_method_id: deliveryMethodId,
       items: cartItemsPayload,
       promo_code: checkoutPromoCode || undefined,
       wilaya_id: activeWilayaId ?? undefined,
@@ -337,7 +325,7 @@ export function CheckoutPage() {
     return () => {
       ignore = true;
     };
-  }, [cartItemsPayload, checkoutPromoCode, deliveryMethodId, deliveryType, cart.length, invalidItems.length, activeWilayaId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cartItemsPayload, checkoutPromoCode, deliveryType, cart.length, invalidItems.length, activeWilayaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const applyPromo = async () => {
     if (cart.length === 0 || invalidItems.length > 0) {
@@ -350,7 +338,6 @@ export function CheckoutPage() {
 
     try {
       const nextPreview = await previewOrder({
-        delivery_method_id: deliveryMethodId,
         items: cartItemsPayload,
         promo_code: normalizedPromoCode || undefined,
         wilaya_id: activeWilayaId ?? undefined,
@@ -384,7 +371,6 @@ export function CheckoutPage() {
 
     try {
       const nextPreview = await previewOrder({
-        delivery_method_id: deliveryMethodId,
         items: cartItemsPayload,
         wilaya_id: activeWilayaId ?? undefined,
         delivery_type: deliveryType,
@@ -460,7 +446,7 @@ export function CheckoutPage() {
     }
 
     if (!validateDeliveryStep()) {
-      setStep(1);
+      toast.error("Veuillez remplir tous les champs obligatoires.");
       return;
     }
 
@@ -472,7 +458,6 @@ export function CheckoutPage() {
         selectedAddressMode === "saved" && selectedAddressId
           ? {
               shipping_address_id: selectedAddressId,
-              delivery_method_id: deliveryMethodId,
               items: cartItemsPayload,
               promo_code: checkoutPromoCode || undefined,
               wilaya_id: activeWilayaId ?? undefined,
@@ -491,7 +476,6 @@ export function CheckoutPage() {
                 wilaya_id: addressForm.wilaya_id ?? undefined,
                 save: addressForm.save,
               },
-              delivery_method_id: deliveryMethodId,
               items: cartItemsPayload,
               promo_code: checkoutPromoCode || undefined,
               wilaya_id: addressForm.wilaya_id ?? undefined,
@@ -505,7 +489,7 @@ export function CheckoutPage() {
       setOrderSuccess(response);
       clearCart();
       setCheckoutPromoCode("");
-      setStep(3);
+      setStep(2);
       toast.success("Commande enregistrée avec succès.");
     } catch (error) {
       if (error instanceof ApiError && error.errors) {
@@ -658,8 +642,9 @@ export function CheckoutPage() {
                     { key: "first_name", label: "Prénom", placeholder: "Jean" },
                     { key: "last_name", label: "Nom", placeholder: "Dupont" },
                     { key: "address", label: "Adresse", placeholder: "Rue des Martyrs, Cité 500 logts", full: true },
+                    { key: "city", label: "Ville", placeholder: "Alger" },
                     { key: "postal_code", label: "Code postal", placeholder: "34000" },
-                    { key: "city", label: "Ville", placeholder: "Bordj Bou Arréridj" },
+                    
                     { key: "phone", label: "Téléphone", placeholder: "06 12 34 56 78", full: true },
                   ].map((field) => (
                     <div key={field.key} className={field.full ? "sm:col-span-2" : ""}>
@@ -752,91 +737,27 @@ export function CheckoutPage() {
                 </div>
               )}
 
-              <button
-                disabled={!canContinueToPayment}
-                className="w-full px-6 py-3.5 rounded-lg bg-[#E8400C] text-white hover:opacity-90 transition-opacity mt-4 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Continuer vers le paiement
-              </button>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-6">
-              <h2 className="text-xl" style={{ fontWeight: 600 }}>Paiement</h2>
-              {checkoutOptions?.payment_methods.map((paymentMethod) => (
-                <div key={paymentMethod.value} className="p-4 rounded-xl border-2 border-[#E8400C] bg-[#E8400C]/5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <input type="radio" checked readOnly className="accent-[#E8400C]" />
-                    <span className="text-sm" style={{ fontWeight: 600 }}>{paymentMethod.label}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{paymentMethod.description}</p>
-                </div>
-              ))}
-
-              <div className="p-4 rounded-xl border border-border bg-card">
-                <div className="flex items-center gap-3 mb-3">
-                  <MapPin className="w-4 h-4 text-[#E8400C]" />
-                  <p className="text-sm" style={{ fontWeight: 600 }}>Adresse de livraison</p>
-                </div>
-                {selectedAddressMode === "saved"
-                  ? (() => {
-                      const selectedAddress = addresses.find((address) => address.id === selectedAddressId);
-                      return selectedAddress ? (
-                        <div className="text-sm text-muted-foreground">
-                          <p className="text-foreground" style={{ fontWeight: 500 }}>{selectedAddress.full_name}</p>
-                          <p>{selectedAddress.address}</p>
-                          <p>{selectedAddress.postal_code ? `${selectedAddress.postal_code} ` : ""}{selectedAddress.city}</p>
-                          {selectedAddress.wilaya_name && (
-                            <p className="text-[#E8400C] flex items-center gap-1 mt-0.5">
-                              <MapPin className="w-3 h-3" />{selectedAddress.wilaya_name}
-                            </p>
-                          )}
-                          <p>{selectedAddress.phone}</p>
-                        </div>
-                      ) : null;
-                    })()
-                  : (
-                    <div className="text-sm text-muted-foreground">
-                      <p className="text-foreground" style={{ fontWeight: 500 }}>{addressForm.first_name} {addressForm.last_name}</p>
-                      <p>{addressForm.address}</p>
-                      <p>{addressForm.postal_code ? `${addressForm.postal_code} ` : ""}{addressForm.city}</p>
-                      {activeWilaya && (
-                        <p className="text-[#E8400C] flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3" />{activeWilaya.name}
-                        </p>
-                      )}
-                      <p>{addressForm.phone}</p>
-                    </div>
-                  )}
-              </div>
-
               <div>
-                <label className="text-sm mb-1 block">Instructions de livraison</label>
+                <label className="text-sm mb-1 block">Instructions de livraison (optionnel)</label>
                 <textarea
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder="Ex: appeler avant la livraison, étage, repère..."
-                  className="w-full min-h-28 px-4 py-3 rounded-lg border border-border bg-card text-sm"
+                  className="w-full min-h-24 px-4 py-3 rounded-lg border border-border bg-card text-sm"
                 />
               </div>
 
-              <div className="flex gap-3">
-                <button onClick={() => setStep(1)} className="px-6 py-3.5 rounded-lg border border-border hover:bg-muted transition-colors">
-                  Retour
-                </button>
-                <button
-                  onClick={submitOrder}
-                  disabled={!canSubmitOrder}
-                  className="flex-1 px-6 py-3.5 rounded-lg bg-[#E8400C] text-white hover:opacity-90 transition-opacity disabled:opacity-60"
-                >
-                  {submitLoading ? "Validation..." : `Confirmer la commande — ${formatPrice(total)}`}
-                </button>
-              </div>
+              <button
+                onClick={submitOrder}
+                disabled={submitLoading || cartItemsPayload.length === 0}
+                className="w-full px-6 py-3.5 rounded-lg bg-[#E8400C] text-white hover:opacity-90 transition-opacity mt-4 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitLoading ? "Validation..." : `Confirmer la commande — ${formatPrice(total)}`}
+              </button>
             </div>
           )}
 
-          {step === 3 && orderSuccess && (
+          {step === 2 && orderSuccess && (
             <div className="text-center py-12">
               <div className="w-20 h-20 mx-auto rounded-full bg-[#22C55E]/10 flex items-center justify-center mb-6">
                 <Check className="w-10 h-10 text-[#22C55E]" />
@@ -864,7 +785,7 @@ export function CheckoutPage() {
           )}
         </div>
 
-        {step < 3 && (
+        {step < 2 && (
           <div className="lg:w-80">
             <div className="sticky top-24 p-5 rounded-xl bg-card border border-border space-y-4">
               <h3 className="text-sm" style={{ fontWeight: 600 }}>Votre commande</h3>

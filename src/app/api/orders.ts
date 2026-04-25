@@ -1,6 +1,5 @@
 import { getToken } from "./auth";
-
-const API_BASE = "http://localhost:8000/api";
+import { buildApiUrl } from "./base";
 
 export class ApiError extends Error {
   status: number;
@@ -103,7 +102,6 @@ export interface OrderPreview {
 export interface PlaceOrderPayload {
   shipping_address_id?: number;
   address?: OrderAddressPayload;
-  delivery_method_id: number;
   items: OrderItemPayload[];
   promo_code?: string;
   wilaya_id?: number;
@@ -211,7 +209,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  const response = await fetch(buildApiUrl(endpoint), {
     method: options.method || (options.body !== undefined ? "POST" : "GET"),
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -235,7 +233,6 @@ export function getCheckoutOptions() {
 }
 
 export function previewOrder(payload: {
-  delivery_method_id: number;
   items: OrderItemPayload[];
   promo_code?: string;
   wilaya_id?: number;
@@ -263,7 +260,7 @@ export async function getMyOrders(): Promise<CustomerOrderListResponse> {
     throw new ApiError("Vous devez vous connecter pour continuer.", 401);
   }
 
-  const response = await fetch(`${API_BASE}/orders`, {
+  const response = await fetch(buildApiUrl("/orders"), {
     headers: {
       Accept: "application/json",
       Authorization: `Bearer ${token}`,

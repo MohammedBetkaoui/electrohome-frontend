@@ -1,7 +1,6 @@
 import { IMAGES } from "../data/store";
 import type { Product } from "../data/store";
-
-const API_BASE = "http://localhost:8000/api";
+import { buildApiUrl } from "./base";
 
 interface CatalogProductResponse {
   id: number;
@@ -44,7 +43,7 @@ export interface CatalogProductsQuery {
 }
 
 async function fetchCatalog<T>(endpoint: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  const response = await fetch(buildApiUrl(endpoint), {
     headers: {
       Accept: "application/json",
     },

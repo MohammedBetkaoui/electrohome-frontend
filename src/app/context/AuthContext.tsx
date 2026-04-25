@@ -78,6 +78,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, [token]);
 
+  // Polling toutes les 30 secondes : détecter un blocage en temps réel
+  useEffect(() => {
+    if (!token || !user) return;
+
+    const interval = setInterval(async () => {
+      const fetchedUser = await apiMe(token);
+      if (!fetchedUser || fetchedUser.client_status === "blocked") {
+        // Token révoqué ou compte bloqué → déconnexion forcée
+        localStorage.removeItem(TOKEN_KEY);
+        setToken(null);
+        setUser(null);
+      } else {
+        setUser(fetchedUser);
+      }
+    }, 10_000);
+
+    return () => clearInterval(interval);
+  }, [token, user]);
+
+  // Écouter l'event global dispatché par les API calls quand 401/403 account_blocked
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      localStorage.removeItem(TOKEN_KEY);
+      setToken(null);
+      setUser(null);
+    };
+
+    window.addEventListener("auth:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("auth:unauthorized", handleUnauthorized);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{

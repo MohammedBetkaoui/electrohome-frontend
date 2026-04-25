@@ -20,6 +20,7 @@ export interface AuthUser {
   role: { id: number; name: string } | null;
   is_admin: boolean;
   is_verified: boolean;
+  client_status: "active" | "inactive" | "blocked" | null;
   created_at: string;
 }
 
@@ -89,6 +90,10 @@ export async function apiMe(token: string): Promise<AuthUser | null> {
   const res = await fetch(`${API_BASE}/auth/me`, {
     headers: { ...headers(), Authorization: `Bearer ${token}` },
   });
+  if (res.status === 401 || res.status === 403) {
+    window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+    return null;
+  }
   if (!res.ok) return null;
   const json = await res.json();
   return json?.data?.user ?? null;
